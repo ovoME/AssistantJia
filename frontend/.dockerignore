@@ -1,0 +1,8 @@
+# 构建上下文排除项（减小镜像体积、避免本地文件进镜像）
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+*.log
+npm-debug.log*

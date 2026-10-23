@@ -18,6 +18,7 @@
 | 步骤8 | 生产部署流水线 | `.github/workflows/deploy.yml`（GHCR + SSH 自动部署） | 🟡 新增 |
 | 步骤8 | 端到端测试 | `tests/e2e/`（conftest + 8 个契约场景 + locust 压测） | 🟡 新增 |
 | 步骤8 | 安全检查 | `docs/安全与权限检查清单.md` | 🟡 新增 |
+| 步骤8 | 依赖更新与镜像扫描 | `.github/dependabot.yml` + CI `security` 任务（Trivy 报告模式） | 🟡 新增 |
 | 步骤8 | 部署文档 | `docs/部署手册.md` | 🟡 新增 |
 | 协作机制 | 接口先行 | 契约以 `docs/api-contract.md` 为准（A 实现、B 对齐已完成） | ✅ |
 | 步骤1 | 确认服务器（配置/SSH/Docker） | 部署手册第一节清单 | ⏳ 待 D 人工 |
@@ -33,7 +34,7 @@
 ## 四、D 验收标准（方案 2.3）
 
 - [ ] `docker compose up` 一键启动全栈，四服务 healthy
-- [ ] CI 绿勾（后端/前端/镜像/集成四类任务）
+- [x] CI 绿勾（PR#3 首次运行 backend/frontend/docker-build 通过；integration 任务待 A 合入后跑满）
 - [ ] 部署文档齐全（部署手册、安全清单、接口契约）
 
 ## 五、遗留与风险提示

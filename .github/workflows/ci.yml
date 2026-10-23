@@ -63,6 +63,31 @@ jobs:
         run: |
           if [ -f frontend/Dockerfile ]; then docker build -t xiaojia-frontend:ci ./frontend; else echo "frontend/Dockerfile 未合入，跳过"; fi
 
+  security:
+    name: 镜像漏洞扫描（Trivy，报告模式）
+    runs-on: ubuntu-latest
+    needs: docker-build
+    steps:
+      - uses: actions/checkout@v4
+      - name: 扫描后端镜像
+        if: ${{ hashFiles('backend/Dockerfile') != '' }}
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: xiaojia-backend:ci
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 0
+      - name: 扫描前端镜像
+        if: ${{ hashFiles('frontend/Dockerfile') != '' }}
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: xiaojia-frontend:ci
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 0
+
   integration:
     name: 集成测试（docker compose + E2E）
     runs-on: ubuntu-latest
