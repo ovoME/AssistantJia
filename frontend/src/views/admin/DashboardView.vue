@@ -402,7 +402,7 @@ onBeforeUnmount(() => {
   text-align: center;
 }
 
-.advice-card { padding: 18px 22px; }
+.advice-card { padding: 18px 22px; margin-top: 16px; }
 .advice-head {
   display: flex;
   align-items: center;
