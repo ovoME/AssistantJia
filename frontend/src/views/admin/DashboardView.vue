@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
-import { NButton, NCard, NSpin, useMessage } from 'naive-ui'
 import { getAdminSummary, getHotBooks, getCategories } from '@/api'
 import type { AdminSummary, BookStat, CategoryStat } from '@/types'
+import { useToast } from '@/composables/useToast'
 
 const router = useRouter()
-const message = useMessage()
+const toast = useToast()
 
 const loading = ref(true)
 const summary = ref<AdminSummary>({
@@ -27,17 +27,16 @@ let pieChart: echarts.ECharts | null = null
 const adviceLoading = ref(false)
 const advice = ref('')
 
+const palette = ['#14b8a6', '#007aff', '#f59e0b', '#a78bfa', '#f472b6', '#34d399', '#60a5fa', '#fb923c']
+
 async function loadData() {
   loading.value = true
   try {
-    const [s, h, c] = await Promise.all([
-      getAdminSummary(),
-      getHotBooks(8),
-      getCategories(),
-    ])
+    const [s, h, c] = await Promise.all([getAdminSummary(), getHotBooks(8), getCategories()])
     summary.value = s
     hotBooks.value = h
     categories.value = c
+    await nextTick()
     renderCharts()
   } finally {
     loading.value = false
@@ -47,46 +46,55 @@ async function loadData() {
 function renderCharts() {
   if (hotChartRef.value) {
     hotChart = echarts.init(hotChartRef.value)
-    const names = hotBooks.value.map((b) => b.title.slice(0, 14))
+    const names = hotBooks.value.map((b) => b.title.slice(0, 12))
     const counts = hotBooks.value.map((b) => b.count)
     hotChart.setOption({
-      grid: { left: 10, right: 30, top: 20, bottom: 10, containLabel: true },
+      grid: { left: 10, right: 36, top: 16, bottom: 10, containLabel: true },
       tooltip: { trigger: 'axis' },
-      xAxis: { type: 'value' },
-      yAxis: { type: 'category', data: names.reverse(), axisLabel: { fontSize: 11 } },
+      xAxis: {
+        type: 'value',
+        splitLine: { lineStyle: { color: 'rgba(20,40,55,0.08)' } },
+        axisLabel: { color: '#6b7d87' },
+      },
+      yAxis: {
+        type: 'category',
+        data: names.slice().reverse(),
+        axisLine: { lineStyle: { color: '#c2ccd2' } },
+        axisLabel: { color: '#42545e', fontSize: 11 },
+      },
       series: [
         {
           type: 'bar',
-          data: counts.reverse(),
+          data: counts.slice().reverse(),
+          barWidth: '58%',
           itemStyle: {
+            borderRadius: [0, 8, 8, 0],
             color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-              { offset: 0, color: '#14b8a6' },
+              { offset: 0, color: '#2dd4bf' },
               { offset: 1, color: '#0f9d8f' },
             ]),
-            borderRadius: [0, 4, 4, 0],
           },
-          label: { show: true, position: 'right', fontSize: 11 },
+          label: { show: true, position: 'right', fontSize: 11, color: '#42545e' },
         },
       ],
     })
   }
-
   if (pieChartRef.value) {
     pieChart = echarts.init(pieChartRef.value)
     pieChart.setOption({
       tooltip: { trigger: 'item' },
-      legend: { bottom: 0, textStyle: { fontSize: 11 } },
+      legend: { bottom: 0, icon: 'circle', textStyle: { color: '#42545e', fontSize: 11 } },
       series: [
         {
           type: 'pie',
-          radius: ['40%', '68%'],
-          center: ['50%', '45%'],
-          data: categories.value.map((c) => ({
+          radius: ['42%', '68%'],
+          center: ['50%', '44%'],
+          data: categories.value.map((c, i) => ({
             name: c.category_name || c.category,
             value: c.count,
+            itemStyle: { color: palette[i % palette.length], borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
           })),
-          itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
-          label: { fontSize: 11 },
+          label: { fontSize: 11, color: '#42545e' },
         },
       ],
     })
@@ -111,18 +119,14 @@ const mockAdvice = `【小嘉智能采购建议 · 基于36,908条借阅数据�
 async function genAdvice() {
   adviceLoading.value = true
   advice.value = ''
-  try {
-    // 真实接口为 POST /api/admin/purchase-advice（流式）；当前 mock
-    const text = mockAdvice
-    // 打字机效果
-    for (const ch of text) {
-      advice.value += ch
-      await new Promise((r) => setTimeout(r, 12))
-    }
-    message.success('采购建议已生成')
-  } finally {
-    adviceLoading.value = false
+  const text = mockAdvice
+  for (const ch of text) {
+    if (!adviceLoading.value) break
+    advice.value += ch
+    await new Promise((r) => setTimeout(r, 10))
   }
+  adviceLoading.value = false
+  toast.success('采购建议已生成')
 }
 
 onMounted(() => {
@@ -138,154 +142,158 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="admin-page">
-    <header class="topbar">
-      <div class="t">
-        <span class="logo">小嘉</span>
-        <span class="sep">|</span>
-        <span>馆藏管理数据看板</span>
+    <header class="topbar lg lg-r22">
+      <span class="lg-inner"></span>
+      <div class="brand">
+        <div class="logo">📊</div>
+        <div class="brand-text">
+          <div class="brand-name">小嘉 · 馆藏运营看板</div>
+          <div class="brand-sub">运营数据 · 仅馆员可见</div>
+        </div>
       </div>
-      <NButton size="small" @click="router.push('/')">返回读者端</NButton>
+      <button class="cu-btn cu-btn-plain" @click="router.push('/')">返回读者端</button>
     </header>
 
-    <NSpin :show="loading">
-      <div class="content">
-        <!-- 概览卡片 -->
-        <div class="stat-row">
-          <NCard class="stat-card">
-            <div class="stat-num teal">{{ summary.total_borrows.toLocaleString() }}</div>
-            <div class="stat-label">总借阅量</div>
-          </NCard>
-          <NCard class="stat-card">
-            <div class="stat-num blue">{{ summary.total_readers.toLocaleString() }}</div>
-            <div class="stat-label">活跃读者</div>
-          </NCard>
-          <NCard class="stat-card">
-            <div class="stat-num orange">{{ summary.total_titles.toLocaleString() }}</div>
-            <div class="stat-label">图书种数</div>
-          </NCard>
-          <NCard class="stat-card">
-            <div class="stat-num green">{{ summary.avg_borrow_per_reader }}</div>
-            <div class="stat-label">人均借阅（册）</div>
-          </NCard>
+    <div class="content">
+      <div class="stat-row">
+        <div
+          v-for="(s, i) in [
+            { label: '总借阅量', value: summary.total_borrows.toLocaleString(), color: '#0f9d8f', icon: '📚' },
+            { label: '活跃读者', value: summary.total_readers.toLocaleString(), color: '#007aff', icon: '👥' },
+            { label: '图书种数', value: summary.total_titles.toLocaleString(), color: '#f59e0b', icon: '📖' },
+            { label: '人均借阅（册）', value: summary.avg_borrow_per_reader, color: '#a78bfa', icon: '🔄' },
+          ]"
+          :key="s.label"
+          class="lg lg-r22 stat-card cu-pop"
+          :style="{ animationDelay: i * 0.07 + 's', '--lg-tr': '18%' }"
+        >
+          <span class="lg-inner"></span>
+          <div class="stat-ico" :style="{ background: s.color + '22', color: s.color }">{{ s.icon }}</div>
+          <div class="stat-num" :style="{ color: s.color }">{{ s.value }}</div>
+          <div class="stat-label">{{ s.label }}</div>
         </div>
-
-        <div class="chart-row">
-          <NCard title="热门图书 TOP8" class="chart-card wide">
-            <div ref="hotChartRef" class="chart tall"></div>
-          </NCard>
-          <NCard title="借阅分类占比" class="chart-card">
-            <div ref="pieChartRef" class="chart tall"></div>
-          </NCard>
-        </div>
-
-        <!-- AI 采购建议 -->
-        <NCard class="advice-card">
-          <template #header>
-            <div class="advice-head">
-              <span>🤖 AI 智能采购建议</span>
-              <NButton type="primary" size="small" :loading="adviceLoading" @click="genAdvice">
-                {{ advice ? '重新生成' : '生成采购建议' }}
-              </NButton>
-            </div>
-          </template>
-          <div v-if="!advice && !adviceLoading" class="advice-empty">
-            点击右上角按钮，小嘉将基于借阅数据自动生成复购、剔旧与学科缺口建议。
-          </div>
-          <pre v-if="advice" class="advice-text">{{ advice }}</pre>
-        </NCard>
       </div>
-    </NSpin>
+
+      <div class="chart-row">
+        <div class="lg-panel chart-card cu-pop" style="animation-delay:0.12s">
+          <h3>热门图书 TOP8</h3>
+          <div ref="hotChartRef" class="chart tall"></div>
+        </div>
+        <div class="lg-panel chart-card cu-pop" style="animation-delay:0.2s">
+          <h3>借阅分类占比</h3>
+          <div ref="pieChartRef" class="chart tall"></div>
+        </div>
+      </div>
+
+      <div class="lg-panel advice-card cu-pop" style="animation-delay:0.28s">
+        <div class="advice-head">
+          <h3>🤖 AI 智能采购建议</h3>
+          <button
+            class="cu-btn cu-btn-teal cu-btn-sm"
+            :disabled="adviceLoading"
+            @click="genAdvice"
+          >
+            {{ advice ? '重新生成' : '生成采购建议' }}
+          </button>
+        </div>
+        <div v-if="!advice && !adviceLoading" class="advice-empty">
+          点击右上角按钮，小嘉将基于借阅数据自动生成复购、剔旧与学科缺口建议。
+        </div>
+        <div v-if="adviceLoading && !advice" class="loading-line">
+          <span class="cu-spinner"><span></span><span></span><span></span></span>
+          小嘉正在分析近期借阅数据…
+        </div>
+        <pre v-if="advice" class="advice-text">{{ advice }}</pre>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.admin-page {
-  min-height: 100vh;
-  background: #f0f3f8;
-}
+.admin-page { position: relative; z-index: 2; min-height: 100vh; }
+
 .topbar {
+  position: sticky;
+  top: 12px;
+  z-index: 20;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 24px;
-  background: #fff;
-  border-bottom: 1px solid #e8eef5;
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  margin: 12px 16px 4px;
+  padding: 10px 18px;
+  min-height: 60px;
 }
-.t {
-  font-size: 16px;
-  font-weight: 700;
-  color: #1f2937;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+.brand { display: flex; align-items: center; gap: 12px; }
 .logo {
-  color: #0f9d8f;
+  width: 42px; height: 42px; border-radius: 50%;
+  background: linear-gradient(135deg, #14b8a6, #0f6e7c);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; box-shadow: 0 4px 10px rgba(15, 157, 143, 0.4);
 }
-.sep {
-  color: #cbd5e1;
-}
+.brand-name { font-size: 16px; font-weight: 700; color: var(--ink); }
+.brand-sub { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+
 .content {
-  padding: 22px 24px;
   max-width: 1200px;
   margin: 0 auto;
+  padding: 16px 20px 44px;
 }
+
 .stat-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
-  margin-bottom: 16px;
 }
 .stat-card {
-  text-align: center;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.stat-ico {
+  width: 38px; height: 38px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 19px; margin-bottom: 2px;
 }
 .stat-num {
-  font-size: 28px;
+  font-size: 30px;
   font-weight: 800;
+  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
 }
-.teal { color: #0f9d8f; }
-.blue { color: #4f8cff; }
-.orange { color: #f59e0b; }
-.green { color: #22c55e; }
-.stat-label {
-  font-size: 13px;
-  color: #6b7280;
-  margin-top: 4px;
-}
+.stat-label { font-size: 13px; color: var(--ink-2); font-weight: 600; }
+
 .chart-row {
   display: grid;
   grid-template-columns: 1.6fr 1fr;
   gap: 16px;
-  margin-bottom: 16px;
+  margin: 16px 0;
 }
-.chart {
-  width: 100%;
-  height: 320px;
-}
-.chart.tall {
-  height: 360px;
-}
+.chart-card { padding: 18px 18px 12px; }
+.chart-card h3 { font-size: 15px; font-weight: 700; color: var(--ink); margin: 0 0 8px; }
+.chart { width: 100%; height: 320px; }
+.chart.tall { height: 340px; }
+
+.advice-card { padding: 18px 22px; }
 .advice-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-bottom: 12px;
 }
-.advice-empty {
-  color: #94a3b8;
-  font-size: 13px;
-  padding: 16px 0;
-}
+.advice-head h3 { font-size: 15px; font-weight: 700; color: var(--ink); }
+.advice-empty { color: var(--ink-3); font-size: 13px; padding: 14px 0; }
+.loading-line { display: flex; align-items: center; gap: 10px; color: var(--ink-3); font-size: 14px; }
 .advice-text {
   white-space: pre-wrap;
   font-family: inherit;
   font-size: 14px;
   line-height: 1.9;
-  color: #334155;
+  color: var(--ink);
   margin: 0;
 }
+
 @media (max-width: 760px) {
   .stat-row { grid-template-columns: repeat(2, 1fr); }
   .chart-row { grid-template-columns: 1fr; }

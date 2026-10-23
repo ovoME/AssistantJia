@@ -1,12 +1,10 @@
 <script setup lang="ts">
+import GlassBackground from '@/components/GlassBackground.vue'
+import CuToastHost from '@/components/cu/CuToastHost.vue'
 </script>
 
 <template>
-  <n-message-provider>
-    <n-dialog-provider>
-      <n-notification-provider>
-        <router-view />
-      </n-notification-provider>
-    </n-dialog-provider>
-  </n-message-provider>
+  <GlassBackground />
+  <router-view />
+  <CuToastHost />
 </template>
