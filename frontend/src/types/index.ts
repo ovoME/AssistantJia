@@ -57,6 +57,10 @@ export interface ChatMessage {
   thought?: string
   cards?: Book[]
   streaming?: boolean
+  /** 该条回复是否因网络/服务错误而失败（用于展示“重新发送”） */
+  error?: boolean
+  /** 对应的用户问题，失败重发时使用 */
+  retryText?: string
   timestamp?: string
 }
 

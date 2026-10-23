@@ -36,7 +36,26 @@ export const useChatStore = defineStore('chat', () => {
 
     messages.value.push({ id: nextId(), role: 'user', content })
     const assistant = pushAssistantPlaceholder()
+    assistant.retryText = content
+    await runStream(content, assistant)
+  }
+
+  /** 对一条失败的助手消息重新发起请求（不重复插入用户消息） */
+  async function retry(assistantId: string) {
+    if (loading.value) return
+    const assistant = messages.value.find((m) => m.id === assistantId)
+    const text = assistant?.retryText
+    if (!assistant || !text) return
+    assistant.content = ''
+    assistant.thought = ''
+    assistant.cards = []
+    assistant.error = false
+    await runStream(text, assistant)
+  }
+
+  async function runStream(content: string, assistant: ChatMessage) {
     loading.value = true
+    assistant.streaming = true
     abortController = new AbortController()
 
     const handle = (e: SseEvent) => {
@@ -53,7 +72,8 @@ export const useChatStore = defineStore('chat', () => {
           }
           break
         case 'error':
-          assistant.content += `\n（出错了：${e.message}）`
+          assistant.error = true
+          assistant.content += `${assistant.content ? '\n' : ''}（出错了：${e.message}）`
           break
         case 'done':
           break
@@ -68,7 +88,8 @@ export const useChatStore = defineStore('chat', () => {
       )
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
-        assistant.content += '\n（网络异常，请稍后重试，或咨询人工服务台）'
+        assistant.error = true
+        if (!assistant.content) assistant.content = '消息发送失败，请检查网络后重试。'
       }
     } finally {
       assistant.streaming = false
@@ -88,5 +109,5 @@ export const useChatStore = defineStore('chat', () => {
     messages.value = []
   }
 
-  return { messages, loading, readerId, sessionId, send, stop, reset }
+  return { messages, loading, readerId, sessionId, send, retry, stop, reset }
 })

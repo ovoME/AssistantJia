@@ -3,6 +3,7 @@ import type { ChatMessage } from '@/types'
 import BookCard from './BookCard.vue'
 
 defineProps<{ message: ChatMessage; readerId?: string }>()
+defineEmits<{ retry: [id: string] }>()
 </script>
 
 <template>
@@ -29,6 +30,12 @@ defineProps<{ message: ChatMessage; readerId?: string }>()
 
         <div v-if="message.cards && message.cards.length" class="cards">
           <BookCard v-for="(b, i) in message.cards" :key="i" :book="b" :reader-id="readerId" />
+        </div>
+
+        <div v-if="message.error && !message.streaming" class="retry-bar">
+          <span class="retry-ic">⚠️</span>
+          <span class="retry-tip">回复失败，请检查网络后重试</span>
+          <button class="cu-btn cu-btn-teal cu-btn-sm" @click="$emit('retry', message.id)">重新发送</button>
         </div>
       </div>
     </template>
@@ -92,4 +99,18 @@ defineProps<{ message: ChatMessage; readerId?: string }>()
 .thought.mini { font-size: 11px; font-style: italic; opacity: 0.7; }
 
 .cards { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; width: 100%; min-width: 290px; }
+
+.retry-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 9px 12px;
+  border-radius: 14px;
+  background: rgba(255, 122, 107, 0.1);
+  border: 1px solid rgba(255, 122, 107, 0.28);
+}
+.retry-ic { font-size: 14px; }
+.retry-tip { font-size: 13px; color: #d15b4f; flex: 1; min-width: 140px; }
 </style>

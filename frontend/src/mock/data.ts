@@ -9,9 +9,9 @@ import type {
 
 /**
  * Mock 数据：后端（A）还没写好前，前端用它独立开发。
- * 后端接口就绪后，把 api 层的 USE_MOCK 关掉即可，无需改组件。
+ * 后端接口就绪后，在 `.env.local` 里设 VITE_USE_MOCK=false 即可关闭，无需改源码。
  */
-export const USE_MOCK = true
+export const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
 
 export const mockBooks: Book[] = [
   {
@@ -121,3 +121,14 @@ export function mockSseChunks(fullText: string, cards: Book[] = []): string[] {
   chunks.push(JSON.stringify({ type: 'done' }))
   return chunks
 }
+
+/** AI 智能采购建议（对应 POST /api/admin/purchase-advice，契约 5.3） */
+export const mockAdvice = `【小嘉智能采购建议 · 基于36,908条借阅数据】
+
+1. 复购建议：建筑/土木类（TU、U类）借阅高度集中，其中《聚丙烯纤维混凝土抗裂防渗性能研究与施工工法》《砌筑工》等热门书借阅量达30+次且可借副本不足，建议各增购3-5本，缓解排队。
+
+2. 学科缺口：物流管理（F252/F253）相关图书借阅集中且复借率高，说明该专业课程需求旺盛，建议围绕冷链物流、仓储管理、物流装备补充新版教材与实务类图书。
+
+3. 冷门调架：部分文学旧书（I类早期版本）借阅量为0，建议结合馆藏年限评估剔旧或移至密集书库，释放黄金架位。
+
+4. 馆藏结构：文学类（I）占比最高，工业技术（T）次之，建议保持工程类新书采购节奏，并增加计算机（TP311/TP312）类前沿图书以匹配学生技术学习需求。`

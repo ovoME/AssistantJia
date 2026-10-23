@@ -5,6 +5,7 @@ import { useChatStore } from '@/stores/chat'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
 import ChatInput from '@/components/chat/ChatInput.vue'
 import CuSheet from '@/components/cu/CuSheet.vue'
+import CuState from '@/components/cu/CuState.vue'
 import { getMyBorrows, renewBook } from '@/api'
 import type { BorrowRecord } from '@/types'
 import { useToast } from '@/composables/useToast'
@@ -16,6 +17,7 @@ const toast = useToast()
 const sheetShow = ref(false)
 const borrows = ref<BorrowRecord[]>([])
 const borrowLoading = ref(false)
+const borrowError = ref('')
 
 const quickQuestions = ['帮我找《三体》', '图书能借多少天？', '怎么续借？', '我想找物流相关的书']
 const messagesEl = ref<HTMLElement | null>(null)
@@ -38,10 +40,11 @@ async function onSend(text: string) {
 async function openBorrows() {
   sheetShow.value = true
   borrowLoading.value = true
+  borrowError.value = ''
   try {
     borrows.value = await getMyBorrows(chat.readerId)
   } catch (e) {
-    toast.error((e as Error).message || '借阅记录加载失败')
+    borrowError.value = (e as Error).message || '借阅记录加载失败，请稍后重试'
   } finally {
     borrowLoading.value = false
   }
@@ -104,6 +107,7 @@ async function onRenew(book: BorrowRecord) {
         :key="m.id"
         :message="m"
         :reader-id="chat.readerId"
+        @retry="chat.retry"
       />
     </main>
 
@@ -114,10 +118,8 @@ async function onRenew(book: BorrowRecord) {
 
     <!-- 我的借阅 -->
     <CuSheet v-model="sheetShow" title="我的借阅">
-      <div v-if="borrowLoading" class="loading-line">
-        <span class="cu-spinner"><span></span><span></span><span></span></span>
-        正在加载借阅记录…
-      </div>
+      <CuState v-if="borrowLoading" type="loading" message="正在加载借阅记录…" />
+      <CuState v-else-if="borrowError" type="error" :message="borrowError" @retry="openBorrows" />
       <div v-else-if="borrows.length" class="borrow-list">
         <div v-for="b in borrows" :key="b.book_id" class="borrow-item lg-panel">
           <div class="b-title">{{ b.title }}</div>
@@ -137,7 +139,7 @@ async function onRenew(book: BorrowRecord) {
           </button>
         </div>
       </div>
-      <div v-else class="empty">暂无借阅记录，问问小嘉找本书吧～</div>
+      <CuState v-else type="empty" message="暂无借阅记录，问问小嘉找本书吧～" />
     </CuSheet>
   </div>
 </template>
