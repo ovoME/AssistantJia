@@ -54,6 +54,14 @@ async function doSearch() {
   }
 }
 
+// 搜索模态打开时自动聚焦输入框
+watch(searchShow, async (v) => {
+  if (v) {
+    await nextTick()
+    document.querySelector<HTMLInputElement>('.search-input')?.focus()
+  }
+})
+
 async function scrollToBottom() {
   await nextTick()
   const el = messagesEl.value
