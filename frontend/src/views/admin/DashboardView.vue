@@ -42,7 +42,7 @@ async function loadData() {
   loading.value = true
   error.value = ''
   try {
-    const [s, h, c, p, t] = await Promise.all([getAdminSummary(), getHotBooks(8), getCategories(), getPublishers(10), getBorrowTrend(30)])
+    const [s, h, c, p, t] = await Promise.all([getAdminSummary(), getHotBooks(10), getCategories(), getPublishers(10), getBorrowTrend(30)])
     summary.value = s
     hotBooks.value = h
     categories.value = c
@@ -224,7 +224,7 @@ function exportHotBooks() {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `热门图书TOP8_${new Date().toISOString().slice(0, 10)}.csv`
+  a.download = `热门图书TOP10_${new Date().toISOString().slice(0, 10)}.csv`
   a.click()
   URL.revokeObjectURL(url)
   toast.success('CSV 已导出')
@@ -342,7 +342,7 @@ onBeforeUnmount(() => {
         <div class="chart-row">
           <div class="lg-panel chart-card cu-pop" style="animation-delay:0.12s">
             <div class="card-head">
-              <h3>热门图书 TOP8</h3>
+              <h3>热门图书 TOP10</h3>
               <button class="cu-btn cu-btn-plain cu-btn-sm" @click="exportHotBooks">导出 CSV</button>
             </div>
             <div class="chart-wrap">
