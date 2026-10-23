@@ -102,9 +102,9 @@ export const mockCategories: CategoryStat[] = [
   { category: 'I', category_name: '文学', count: 4213 },
   { category: 'T', category_name: '工业技术', count: 2890 },
   { category: 'F', category_name: '经济', count: 1640 },
-  { category: 'B', category_name: '哲学/心理', count: 1180 },
-  { category: 'H', category_name: '语言文字', count: 960 },
-  { category: 'C', category_name: '社会科学', count: 834 },
+  { category: 'B', category_name: '哲学', count: 1180 },
+  { category: 'H', category_name: '语言', count: 960 },
+  { category: 'C', category_name: '社科', count: 834 },
   { category: 'J', category_name: '艺术', count: 620 },
 ]
 
