@@ -37,6 +37,8 @@ defineEmits<{ retry: [id: string] }>()
           <span class="retry-tip">回复失败，请检查网络后重试</span>
           <button class="cu-btn cu-btn-teal cu-btn-sm" @click="$emit('retry', message.id)">重新发送</button>
         </div>
+
+        <div v-if="message.timestamp" class="ts">{{ message.timestamp }}</div>
       </div>
     </template>
 
@@ -44,6 +46,7 @@ defineEmits<{ retry: [id: string] }>()
     <template v-else>
       <div class="col user-col">
         <div class="bubble-u cu-bubble-in">{{ message.content }}</div>
+        <div v-if="message.timestamp" class="ts">{{ message.timestamp }}</div>
       </div>
       <div class="avatar user">我</div>
     </template>
@@ -113,4 +116,5 @@ defineEmits<{ retry: [id: string] }>()
 }
 .retry-ic { font-size: 14px; }
 .retry-tip { font-size: 13px; color: #d15b4f; flex: 1; min-width: 140px; }
+.ts { font-size: 11px; color: var(--ink-3); margin-top: 4px; opacity: 0.8; }
 </style>

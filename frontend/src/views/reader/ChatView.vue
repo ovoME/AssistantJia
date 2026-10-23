@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { ref, nextTick, watch } from 'vue'
+import { ref, nextTick, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
 import ChatInput from '@/components/chat/ChatInput.vue'
 import CuSheet from '@/components/cu/CuSheet.vue'
 import CuState from '@/components/cu/CuState.vue'
-import { getMyBorrows, renewBook } from '@/api'
-import type { BorrowRecord } from '@/types'
+import { getMyBorrows, renewBook, getRecommend } from '@/api'
+import type { BorrowRecord, RecommendBook } from '@/types'
 import { useToast } from '@/composables/useToast'
 
 const router = useRouter()
@@ -18,9 +18,18 @@ const sheetShow = ref(false)
 const borrows = ref<BorrowRecord[]>([])
 const borrowLoading = ref(false)
 const borrowError = ref('')
+const recommends = ref<RecommendBook[]>([])
 
 const quickQuestions = ['帮我找《三体》', '图书能借多少天？', '怎么续借？', '我想找物流相关的书']
 const messagesEl = ref<HTMLElement | null>(null)
+
+onMounted(async () => {
+  try {
+    recommends.value = await getRecommend(chat.readerId, 4)
+  } catch {
+    // 推荐位加载失败静默忽略，不打扰主流程
+  }
+})
 
 async function scrollToBottom() {
   await nextTick()
@@ -75,6 +84,7 @@ async function onRenew(book: BorrowRecord) {
         </div>
       </div>
       <div class="actions">
+        <button v-if="chat.messages.length" class="cu-btn cu-btn-plain" @click="chat.reset()">新对话</button>
         <button class="cu-btn cu-btn-plain" @click="openBorrows">我的借阅</button>
         <button class="cu-btn cu-btn-plain" @click="router.push('/admin')">管理端</button>
       </div>
@@ -98,6 +108,24 @@ async function onRenew(book: BorrowRecord) {
           >
             <span class="lg-inner"></span>{{ q }}
           </button>
+        </div>
+
+        <!-- 个性化推荐（仅在欢迎页展示） -->
+        <div v-if="recommends.length" class="recommend cu-fade-in" style="animation-delay: 0.5s">
+          <div class="rec-title">✨ 为你推荐</div>
+          <div class="rec-row">
+            <button
+              v-for="r in recommends"
+              :key="r.isbn"
+              class="lg lg-tap rec-card"
+              @click="onSend(`我想找《${r.title}》`)"
+            >
+              <span class="lg-inner"></span>
+              <div class="rec-book">{{ r.title }}</div>
+              <div class="rec-author">{{ r.author }}</div>
+              <div class="rec-reason">{{ r.reason }}</div>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -222,4 +250,28 @@ async function onRenew(book: BorrowRecord) {
 .b-title { font-size: 15px; font-weight: 600; margin-bottom: 8px; color: var(--ink); }
 .b-meta { display: flex; align-items: center; gap: 10px; color: var(--ink-3); font-size: 13px; margin-bottom: 8px; }
 .empty { text-align: center; color: var(--ink-3); padding: 26px 0; }
+
+/* 个性化推荐位 */
+.recommend { width: 100%; max-width: 560px; }
+.rec-title { font-size: 14px; font-weight: 700; color: var(--ink-2); margin-bottom: 12px; }
+.rec-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scroll-snap-type: x mandatory;
+}
+.rec-card {
+  flex: 0 0 200px;
+  scroll-snap-align: start;
+  padding: 14px 16px;
+  border-radius: 18px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rec-book { font-size: 14px; font-weight: 700; color: var(--ink); line-height: 1.4; }
+.rec-author { font-size: 12px; color: var(--ink-3); }
+.rec-reason { font-size: 12px; color: var(--ink-2); line-height: 1.5; margin-top: 4px; }
 </style>
