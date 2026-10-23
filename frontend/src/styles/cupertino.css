@@ -1,0 +1,219 @@
+/* ============================================================
+   小嘉 · Cupertino + Liquid Glass（纯 CSS 高仿苹果液态玻璃）
+   玻璃材质原理：backdrop-blur + 多层 inset 高光 + 黑色 blur 描边，
+   靠 filter: contrast(3) 把模糊黑边收缩成锐利液态边缘（双实线边框）。
+   规范来源：emilkowalski/skills · apple-design
+   ============================================================ */
+
+:root {
+  --ios-blue: #007aff;
+  --ios-blue-hi: #2f93ff;
+  --ios-teal: #0f9d8f;
+  --ios-teal-hi: #14b8a6;
+  --ios-green: #18a058;
+  --ios-orange: #f59e0b;
+  --ios-red: #ff3b30;
+  --ink: #16262e;
+  --ink-2: #42545e;
+  --ink-3: #6b7d87;
+
+  /* 动效 */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --t-press: 0.14s;
+  --t-pop: 0.22s;
+  --t-sheet: 0.42s;
+
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC',
+    'Helvetica Neue', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; color: var(--ink); }
+button {
+  font-family: inherit;
+  border: none;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+  background: none;
+  cursor: pointer;
+}
+button:focus-visible { outline: 2px solid rgba(20, 184, 166, 0.6); outline-offset: 2px; }
+textarea { font-family: inherit; }
+
+/* ==================== 液态玻璃（自然苹果磨砂 · 无 contrast） ====================
+   半透乳白 + 强磨砂饱和 + 明亮顶部高光与边缘 + 柔和投影；
+   不使用滤镜，内部文字、图标、图表颜色完全不失真。 */
+.lg {
+  position: relative;
+  border-radius: var(--lg-r, 999px);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.5);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  box-shadow:
+    inset 0 1.5px 1px rgba(255, 255, 255, 1),
+    inset 0 -1px 2px rgba(120, 160, 170, 0.12),
+    0 10px 28px rgba(20, 50, 60, 0.14);
+  isolation: isolate;
+}
+/* 顶部玻璃高光 */
+.lg::after {
+  content: '';
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), transparent 38%);
+  pointer-events: none;
+}
+/* 内圈淡亮线（双实线亮边） */
+.lg > .lg-inner {
+  position: absolute;
+  z-index: 2;
+  inset: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: inherit;
+  pointer-events: none;
+}
+.lg > * { position: relative; z-index: 3; }
+
+/* 玻璃尺寸/圆角变体 */
+.lg-r22 { --lg-r: 22px; }
+.lg-r18 { --lg-r: 18px; }
+.lg-r14 { --lg-r: 14px; }
+
+/* 可交互玻璃：悬停/按压反馈（pointer-down） */
+.lg-tap {
+  cursor: pointer;
+  transition: transform var(--t-press) var(--ease-out), box-shadow var(--t-press);
+  will-change: transform;
+}
+.lg-tap:hover { transform: translateY(-2px); }
+.lg-tap:active { transform: scale(0.97); }
+
+/* ==================== 普通磨砂面板（用于图表/长文，不 contrast） ==================== */
+.lg-panel {
+  position: relative;
+  background: rgba(255, 255, 255, 0.66);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  backdrop-filter: blur(22px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 22px;
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.95),
+    inset 0 -2px 6px rgba(255, 255, 255, 0.3),
+    0 12px 34px rgba(20, 45, 58, 0.14);
+}
+
+/* ==================== 按钮 ==================== */
+.cu-btn {
+  font: inherit;
+  font-weight: 600;
+  font-size: 15px;
+  border-radius: 999px;
+  padding: 9px 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition: transform var(--t-press) var(--ease-out), filter var(--t-press), opacity var(--t-press);
+}
+.cu-btn:active { transform: scale(0.94); }
+.cu-btn:disabled { opacity: 0.4; cursor: default; }
+.cu-btn:disabled:active { transform: none; }
+.cu-btn-primary {
+  color: #fff;
+  background: linear-gradient(180deg, var(--ios-blue-hi), var(--ios-blue));
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.4), 0 6px 16px rgba(0, 122, 255, 0.35);
+}
+.cu-btn-teal {
+  color: #fff;
+  background: linear-gradient(180deg, var(--ios-teal-hi), var(--ios-teal));
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.4), 0 6px 16px rgba(15, 157, 143, 0.38);
+}
+.cu-btn-plain { color: var(--ios-blue); background: transparent; padding: 8px 10px; font-weight: 600; }
+.cu-btn-sm { font-size: 13px; padding: 7px 14px; }
+
+/* 玻璃内嵌黑色圆形按钮（Get started 同款） */
+.lg-dot {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #1c1c1c;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.55), 0 4px 10px rgba(0, 0, 0, 0.3);
+  transition: transform var(--t-press) var(--ease-out);
+}
+.lg-dot:active { transform: scale(0.88); }
+
+/* ==================== 徽章 ==================== */
+.cu-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  line-height: 1.5;
+}
+.cu-tag-green { background: rgba(16, 157, 143, 0.14); color: #0b7a6e; border: 1px solid rgba(16, 157, 143, 0.28); }
+.cu-tag-gray { background: rgba(60, 60, 67, 0.12); color: #6b7d87; border: 1px solid rgba(60, 60, 67, 0.14); }
+.cu-tag-orange { background: rgba(245, 158, 11, 0.16); color: #c2700a; border: 1px solid rgba(245, 158, 11, 0.3); }
+.cu-tag-red { background: rgba(255, 59, 48, 0.14); color: #d6322a; border: 1px solid rgba(255, 59, 48, 0.28); }
+
+/* ==================== 加载 ==================== */
+.cu-spinner { display: inline-flex; gap: 5px; align-items: center; }
+.cu-spinner span {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--ios-teal);
+  animation: cu-bounce 1s var(--ease-out) infinite;
+}
+.cu-spinner span:nth-child(2) { animation-delay: 0.15s; }
+.cu-spinner span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes cu-bounce {
+  0%, 100% { transform: translateY(0); opacity: 0.5; }
+  40% { transform: translateY(-6px); opacity: 1; }
+}
+.cu-spin-ring {
+  width: 26px; height: 26px; border-radius: 50%;
+  border: 2.5px solid rgba(15, 157, 143, 0.2);
+  border-top-color: var(--ios-teal);
+  animation: cu-rotate 0.8s linear infinite;
+}
+@keyframes cu-rotate { to { transform: rotate(360deg); } }
+
+/* ==================== 底部 Sheet ==================== */
+/* 遮罩只用半透明暗色，不加 backdrop-filter，避免与面板的磨砂嵌套导致内容被模糊 */
+.cu-scrim {
+  position: fixed; inset: 0; background: rgba(20, 30, 38, 0.28);
+  z-index: 80;
+  animation: cu-fade-in 0.25s ease both;
+}
+
+/* ==================== 入场 ==================== */
+@keyframes cu-pop {
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes cu-bubble {
+  from { opacity: 0; transform: translateY(10px) scale(0.9); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes cu-fade { from { opacity: 0; } to { opacity: 1; } }
+.cu-pop { animation: cu-pop var(--t-pop) var(--ease-out) both; }
+.cu-bubble-in { animation: cu-bubble 0.28s var(--ease-spring) both; }
+.cu-fade-in { animation: cu-fade var(--t-pop) var(--ease-out) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cu-pop, .cu-bubble-in, .cu-fade-in { animation: cu-fade 0.2s ease both !important; }
+  .cu-spinner span, .cu-spin-ring { animation: none; }
+}
