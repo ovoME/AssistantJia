@@ -100,20 +100,29 @@ function renderCharts() {
   }
   if (pieChartRef.value) {
     pieChart = echarts.init(pieChartRef.value)
+    const totalCats = categories.value.reduce((s, c) => s + c.count, 0)
     pieChart.setOption({
-      tooltip: { trigger: 'item' },
       legend: { bottom: 0, icon: 'circle', textStyle: { color: '#42545e', fontSize: 11 } },
+      title: {
+        text: totalCats.toLocaleString(),
+        subtext: '总借阅',
+        left: 'center',
+        top: '34%',
+        textAlign: 'center',
+        textStyle: { fontSize: 20, fontWeight: 700, color: '#16262e' },
+        subtextStyle: { fontSize: 11, color: '#6b7d87' },
+      },
       series: [
         {
           type: 'pie',
-          radius: ['42%', '68%'],
+          radius: ['48%', '70%'],
           center: ['50%', '44%'],
           data: categories.value.map((c, i) => ({
             name: c.category_name || c.category,
             value: c.count,
             itemStyle: { color: palette[i % palette.length], borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
           })),
-          label: { fontSize: 11, color: '#42545e' },
+          label: { fontSize: 11, color: '#42545e', overflow: 'none', width: 80 },
         },
       ],
     })
@@ -264,7 +273,12 @@ onBeforeUnmount(() => {
           <div class="brand-sub">运营数据 · 仅馆员可见</div>
         </div>
       </div>
-      <button class="cu-btn cu-btn-plain" @click="router.push('/')">返回读者端</button>
+      <div class="topbar-actions">
+        <button class="cu-btn cu-btn-plain" @click="loadData" :disabled="loading">
+          {{ loading ? '刷新中…' : '刷新数据' }}
+        </button>
+        <button class="cu-btn cu-btn-plain" @click="router.push('/')">返回读者端</button>
+      </div>
     </header>
 
     <div class="content">
@@ -392,6 +406,7 @@ onBeforeUnmount(() => {
   padding: 10px 18px;
   min-height: 60px;
 }
+.topbar-actions { display: flex; gap: 8px; align-items: center; }
 .brand { display: flex; align-items: center; gap: 12px; }
 .logo {
   width: 42px; height: 42px; border-radius: 50%;
@@ -412,6 +427,7 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
+  margin-bottom: 16px;
 }
 .stat-card {
   padding: 18px;

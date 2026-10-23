@@ -89,6 +89,12 @@ async function openBorrows() {
     borrowLoading.value = false
   }
 }
+function isDueSoon(b: BorrowRecord): boolean {
+  if (b.is_overdue) return false
+  const days = Math.ceil((new Date(b.due_date).getTime() - Date.now()) / 86400000)
+  return days <= 7
+}
+
 async function onRenew(book: BorrowRecord) {
   try {
     const r = await renewBook(chat.readerId, book.book_id)
@@ -191,8 +197,8 @@ async function onRenew(book: BorrowRecord) {
           <div class="b-title">{{ b.title }}</div>
           <div class="b-meta">
             <span>应还：{{ b.due_date }}</span>
-            <span class="cu-tag" :class="b.is_overdue ? 'cu-tag-red' : 'cu-tag-green'">
-              {{ b.is_overdue ? '已逾期' : '借阅中' }}
+            <span class="cu-tag" :class="b.is_overdue ? 'cu-tag-red' : isDueSoon(b) ? 'cu-tag-orange' : 'cu-tag-green'">
+              {{ b.is_overdue ? '已逾期' : isDueSoon(b) ? '即将到期' : '借阅中' }}
             </span>
           </div>
           <div class="b-meta">已续借 {{ b.renew_count }} 次</div>
@@ -331,10 +337,13 @@ async function onRenew(book: BorrowRecord) {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  box-shadow: inset 0 1.5px 1px rgba(255,255,255,1), 0 4px 12px rgba(20,50,60,0.08);
 }
 .rec-book { font-size: 14px; font-weight: 700; color: var(--ink); line-height: 1.4; }
 .rec-author { font-size: 12px; color: var(--ink-3); }
 .rec-reason { font-size: 12px; color: var(--ink-2); line-height: 1.5; margin-top: 4px; }
+
+.quick-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 
 /* 馆藏搜索 */
 .search-btn { display: inline-flex; align-items: center; gap: 4px; }

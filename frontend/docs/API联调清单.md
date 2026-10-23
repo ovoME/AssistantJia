@@ -34,6 +34,8 @@
 | `getAdminSummary` | GET | `/api/admin/stats/summary` | — | `AdminSummary{...}` | 管理端 | ✅ |
 | `getHotBooks` | GET | `/api/admin/stats/hot-books` | `limit` | `BookStat[]{title, author, count}` | 管理端 TOP8 | ✅ |
 | `getCategories` | GET | `/api/admin/stats/categories` | — | `CategoryStat[]{category, category_name, count}` | 管理端环形图 | ✅ |
+| `getPublishers` | GET | `/api/admin/stats/publishers` | `limit=10` | `BookStat[]{title, count}` | 管理端出版社TOP10 | ✅ mock |
+| `getBorrowTrend` | GET | `/api/admin/stats/trend` | `days=30` | `BorrowTrendPoint[]{date, count}` | 管理端趋势折线图 | ✅ mock |
 | `getPurchaseAdvice` | POST | `/api/admin/purchase-advice` | — | `string`（建议正文，前端打字机展示） | 管理端 AI 建议 | ✅ |
 
 ### SSE 事件约定（`/api/chat`）
@@ -56,6 +58,7 @@
 - `BorrowRecord{book_id, title, borrow_date, due_date, renew_count, is_overdue}`
 - `AdminSummary{total_borrows, total_readers, total_titles, avg_borrow_per_reader}`
 - `BookStat{title, author?, count}` / `CategoryStat{category, category_name?, count}`
+- `BorrowTrendPoint{date, count}`（近N天每日借阅量）
 
 ---
 
@@ -65,7 +68,7 @@
 |---|---|---|---|
 | 高 | `GET /api/chat/history/{session_id}` | 对话历史，刷新页面不丢消息（契约 1.2） | 未实现，需留 session 持久化 |
 | 中 | `GET /api/hot-books` | 读者侧热门图书推荐位 | 未接页面 |
-| 中 | `GET /api/admin/stats/publishers` | 出版社 TOP10 条形图 | 契约已有，前端待加图表 |
+| 中 | `GET /api/admin/stats/trend` | 近30天每日借阅量趋势折线图 | 前端已接 mock，待真实接口 |
 | 低 | `POST /api/admin/book-review` | 书评生成 | 需先补契约 |
 
 ---
