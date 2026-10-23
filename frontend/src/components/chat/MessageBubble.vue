@@ -30,20 +30,12 @@ async function copyText() {
         </div>
         <div v-if="message.thought && message.content" class="thought mini">{{ message.thought }}</div>
 
-        <div v-if="message.content" class="bubble-wrap">
-          <div class="lg bubble-b cu-bubble-in">
-            <span class="lg-inner"></span>
-            <span class="content-text">{{ message.content }}</span>
-            <span v-if="message.streaming" class="cursor">▍</span>
-          </div>
-          <button class="copy-btn" @click="copyText" title="复制内容">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-              <rect x="9" y="9" width="12" height="12" rx="2" stroke="currentColor" stroke-width="2"/>
-              <path d="M5 15V5a2 2 0 0 1 2-2h10" stroke="currentColor" stroke-width="2"/>
-            </svg>
-          </button>
+        <div v-if="message.content" class="lg bubble-b cu-bubble-in">
+          <span class="lg-inner"></span>
+          <span class="content-text">{{ message.content }}</span>
+          <span v-if="message.streaming" class="cursor">▍</span>
         </div>
-        <div v-else-if="message.streaming && !message.thought" class="lg bubble-b think cu-bubble-in">
+        <div v-if="message.streaming && !message.thought" class="lg bubble-b think cu-bubble-in">
           <span class="lg-inner"></span>
           <span class="cu-spinner"><span></span><span></span><span></span></span>
         </div>
@@ -58,23 +50,31 @@ async function copyText() {
           <button class="cu-btn cu-btn-teal cu-btn-sm" @click="$emit('retry', message.id)">重新发送</button>
         </div>
 
-        <div v-if="message.timestamp" class="ts">{{ message.timestamp }}</div>
+        <div v-if="message.content || message.timestamp" class="meta-row">
+          <span v-if="message.timestamp" class="ts">{{ message.timestamp }}</span>
+          <button v-if="message.content" class="copy-btn" @click="copyText" title="复制内容">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+              <rect x="9" y="9" width="12" height="12" rx="2" stroke="currentColor" stroke-width="2"/>
+              <path d="M5 15V5a2 2 0 0 1 2-2h10" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </button>
+        </div>
       </div>
     </template>
 
     <!-- 用户 -->
     <template v-else>
       <div class="col user-col">
-        <div class="bubble-wrap user-wrap">
-          <div class="bubble-u cu-bubble-in">{{ message.content }}</div>
-          <button class="copy-btn" @click="copyText" title="复制内容">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+        <div class="bubble-u cu-bubble-in">{{ message.content }}</div>
+        <div v-if="message.content || message.timestamp" class="meta-row">
+          <button v-if="message.content" class="copy-btn" @click="copyText" title="复制内容">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
               <rect x="9" y="9" width="12" height="12" rx="2" stroke="currentColor" stroke-width="2"/>
               <path d="M5 15V5a2 2 0 0 1 2-2h10" stroke="currentColor" stroke-width="2"/>
             </svg>
           </button>
+          <span v-if="message.timestamp" class="ts">{{ message.timestamp }}</span>
         </div>
-        <div v-if="message.timestamp" class="ts">{{ message.timestamp }}</div>
       </div>
       <div class="avatar user">我</div>
     </template>
@@ -82,7 +82,7 @@ async function copyText() {
 </template>
 
 <style scoped>
-.row { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 16px; }
+.row { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 20px; }
 .row.user { justify-content: flex-end; }
 .avatar {
   flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%;
@@ -144,18 +144,20 @@ async function copyText() {
 }
 .retry-ic { font-size: 14px; }
 .retry-tip { font-size: 13px; color: #d15b4f; flex: 1; min-width: 140px; }
-.ts { font-size: 11px; color: var(--ink-3); margin-top: 4px; opacity: 0.8; }
+.ts { font-size: 11px; color: var(--ink-3); opacity: 0.8; }
 
-.bubble-wrap { display: flex; align-items: center; gap: 4px; }
-.user-wrap { justify-content: flex-end; }
+.meta-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.user-col .meta-row { justify-content: flex-end; }
+
 .copy-btn {
-  opacity: 0;
+  opacity: 0.45;
   transition: opacity 0.15s ease;
   color: var(--ink-3);
-  padding: 3px;
-  border-radius: 6px;
-  flex: 0 0 auto;
+  padding: 2px;
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
 }
-.bubble-wrap:hover .copy-btn { opacity: 0.6; }
+.meta-row:hover .copy-btn { opacity: 0.8; }
 .copy-btn:hover { opacity: 1 !important; color: var(--ink-2); background: rgba(0,0,0,0.05); }
 </style>
