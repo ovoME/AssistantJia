@@ -1,0 +1,84 @@
+# 小嘉 C1 借阅数据清洗与统计
+
+这是 C 负责的数据模块首版。它把借阅 Excel 或 CSV 转成统一的借阅流水、图书主数据、读者列表、质量报告及看板统计。测试数据全部由程序生成，不是馆方数据。
+
+## 运行
+
+需要 Python 3.11 或更高版本。在仓库根目录打开 PowerShell：
+
+```powershell
+python -m pip install -r data/requirements.txt
+python -m data.scripts.generate_demo --rows 36908
+python -m data.scripts.clean_data --input data/demo/borrow_records_demo.csv --dataset-label simulated
+python -m data.scripts.analyze
+python -m unittest discover -s data/tests -v
+```
+
+运行后查看 `data/processed/quality_report.md`、`summary.json` 和 `dashboard.json`。`api_summary.json`、`api_hot_books.json`、`api_categories.json`、`api_publishers.json` 是供 A 接入的响应文件，字段对齐已有前端约定；它们尚未由 HTTP 服务发布。所有命令从仓库根目录运行。
+
+真实数据到位后，原文件放到 `data/raw/`，替换输入路径即可：
+
+```powershell
+python -m data.scripts.clean_data --input "data/raw/图书借阅数据.xlsx" --dataset-label real
+python -m data.scripts.analyze
+```
+
+默认读取第一个工作表、第一行表头。其他工作表可加 `--sheet "工作表名称"`。旧版 `.xls` 请先另存为 `.xlsx`。不要把多行说明放在表头上方。程序不会修改源文件。
+
+## 输入与清洗规则
+
+| 原始字段 | 标准字段 | 处理 |
+| --- | --- | --- |
+| 证件号 | reader_id | 按文本读取，保留已有前导零 |
+| 索书号 | call_number | 全半角统一，转大写，清除空白 |
+| 财产号或条码号 | book_id | 按文本读取，表示副本标识 |
+| 题名或书名 | title | 全半角统一，压缩多余空白 |
+| 责任者或作者 | author | 保留内容，规范空白 |
+| ISBN 或 IISSBN | isbn | 清除 ISBN 前缀、分隔符，检查 10/13 位校验码 |
+| 出版社或出版者 | publisher | 保留内容，规范空白 |
+
+必须有证件号和题名两列表头。其余列缺失时会补空列并写入报告。缺少读者或题名的行转入待核查文件；不猜测身份或补造书名。相同标准字段的流水只报告疑似重复并保留，因为当前没有日期或流水号判断它是否是真实复借。
+
+图书主键 `book_key` 优先使用通过校验的 ISBN13，将等价的 ISBN10 合并。没有合法 ISBN 时，先查同一财产号在其他有效流水中是否唯一对应某个合法 ISBN；可确认就关联，但不改写原始 ISBN 字段。不能确认时使用财产号；财产号也缺失时使用题名、作者、出版社的精确组合哈希。完全缺少有效关联的不同副本仍可能分开计算，需结合质量报告看待书种数。一个财产号对应多个合法 ISBN 时报告冲突，不据此补做关联。同一 ISBN 出现冲突题名、作者、出版社时，报告冲突组数，主数据显示最常见非空值，流水仍保留原信息。books.csv 的 ISBN 只输出经过校验的标准 ISBN13，其余留空。
+
+## 输出
+
+默认输出到 `data/processed/`，重复运行覆盖同名生成文件，不追加：
+
+| 文件 | 内容 |
+| --- | --- |
+| borrow_records.csv | 接受的借阅流水，含源行号、book_key、分类 |
+| books.csv | 按 book_key 汇总的图书主数据、借阅次数、出现过的副本数 |
+| readers.csv | 读者列表、借阅次数、借过的不同 book_key 数 |
+| rejected_records.csv | 待核查流水及原因，源行号可追溯至原文件 |
+| quality_report.json 和 .md | 缺失率、疑似重复、错号、分类及主数据冲突 |
+| summary.csv 和 .json | 总借阅、读者、图书标识、题名、副本数、人均借阅 |
+| hot_books.csv 和 .json | 热门图书 TOP100，以借阅次数排序 |
+| categories.csv 和 .json | 中图法大类借阅次数及占比，包含未知分类 |
+| publishers.csv 和 .json | 出版社 TOP20，空白出版社以缺失标志区分 |
+| reader_distribution.csv 和 .json | 每种借阅次数对应的读者人数 |
+| reader_preferences.csv 和 .json | 每位读者的分类次数和占比 |
+| dashboard.json | 给 B 对接的数据结构示例，不含读者标识或逐人偏好 |
+| api_summary.json 等四份 api_*.json | 按既有契约封装的概览、热门图书、分类、出版社响应 |
+
+所有统计基于接受的流水。图书数是借阅样本内的 `book_key` 数，并非方案按唯一题名统计的 22,318；另有 `unique_title_count` 可做同口径比较。副本数只代表数据里出现过的副本，不能当作馆藏复本总量。出版社、未知类别均保留实际缺失语义。
+
+输入没有借阅日期、架位、读者年级或专业，首版不生成趋势、实时馆藏状态和这些属性画像。“读者画像”只指历史借阅分类偏好。采购复购率还需要馆藏总量、复本和可用状态数据。
+
+## 测试数据
+
+模拟 CSV 固定随机种子为 20261023，默认包含 36,908 行模拟流水，候选池为 358 个虚构读者和 200 本虚构图书，并注入缺失、错误 ISBN、未知分类及相同流水。规模与方案相同仅用于测试程序，不复现真实读者数或真实书种数。仓库保存生成脚本，生成的数据留在本地。
+
+可重新生成 CSV：
+
+```powershell
+python -m data.scripts.generate_demo --rows 36908 --output data/demo/borrow_records_demo.csv
+```
+
+## 团队对接
+
+模块位于 `data/`，测试位于 `data/tests/`，轻量依赖位于 `data/requirements.txt`，与现有后端依赖下限保持一致。前端和现有后端服务入口由各自负责人接入。`docs/c-data-contract.md` 说明原生统计字段与现有接口字段的映射；`total_titles` 使用规范化题名数，和 `book_key` 数分开。
+
+仓库 `.gitignore` 排除真实原始数据、生成数据和模拟 CSV，保留目录占位。真实借阅记录、证件号、逐人画像留在本地数据目录。
+
+下一阶段是 C2 分类热门推荐；C3 OPAC 需要真实地址及接口说明；C4 知识库需要馆方原始规则；C5 统计 HTTP 接口需与 A、D 的现有结构及鉴权方式对齐。本包交付的是 C1，不把其他模块标记为已完成。
