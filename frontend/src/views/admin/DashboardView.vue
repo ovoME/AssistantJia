@@ -418,6 +418,7 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
+  margin-bottom: 16px;
 }
 .stat-card {
   padding: 18px;
