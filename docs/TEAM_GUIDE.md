@@ -4,6 +4,17 @@
 
 ---
 
+## 👥 团队成员与角色认领
+
+| 角色 | 姓名 / GitHub ID | 职责定位 | 核心开发目录 | 专属分支前缀 |
+| :--- | :--- | :--- | :--- | :--- |
+| **角色 A** | [@ovoME](https://github.com/ovoME) | 后端 Agent 工程师（智能体大脑） | `backend/` | `feature/backend-` |
+| **角色 B** | [@bakashinji1204](https://github.com/bakashinji1204) | Web 前端工程师（交互与可视化） | `frontend/` | `feature/frontend-` |
+| **角色 C** | [@haidann](https://github.com/haidann) | 数据与算法工程师（数据与知识库） | `data/` | `feature/data-` |
+| **角色 D** | [@Hellan-w](https://github.com/Hellan-w) | 全栈集成协调（容器化与CI/CD） | `deploy/`, `docs/` | `feature/deploy-` |
+
+---
+
 ## 一、启动准备（全员必读，D 负责执行）
 
 ### 1.1 代码仓库与协作规范
