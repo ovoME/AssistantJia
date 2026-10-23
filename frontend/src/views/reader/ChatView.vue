@@ -89,6 +89,12 @@ async function openBorrows() {
     borrowLoading.value = false
   }
 }
+function isDueSoon(b: BorrowRecord): boolean {
+  if (b.is_overdue) return false
+  const days = Math.ceil((new Date(b.due_date).getTime() - Date.now()) / 86400000)
+  return days <= 7
+}
+
 async function onRenew(book: BorrowRecord) {
   try {
     const r = await renewBook(chat.readerId, book.book_id)
@@ -191,8 +197,8 @@ async function onRenew(book: BorrowRecord) {
           <div class="b-title">{{ b.title }}</div>
           <div class="b-meta">
             <span>应还：{{ b.due_date }}</span>
-            <span class="cu-tag" :class="b.is_overdue ? 'cu-tag-red' : 'cu-tag-green'">
-              {{ b.is_overdue ? '已逾期' : '借阅中' }}
+            <span class="cu-tag" :class="b.is_overdue ? 'cu-tag-red' : isDueSoon(b) ? 'cu-tag-orange' : 'cu-tag-green'">
+              {{ b.is_overdue ? '已逾期' : isDueSoon(b) ? '即将到期' : '借阅中' }}
             </span>
           </div>
           <div class="b-meta">已续借 {{ b.renew_count }} 次</div>
