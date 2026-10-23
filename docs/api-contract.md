@@ -193,6 +193,17 @@ data: {"type": "done"}
 - **Method**: `GET`
 - **Path**: `/api/hot-books`
 - **Query Params**: `category=I&limit=10`
+- **语义**: 按借阅量倒序的全馆热门榜；`category` 过滤生效（如 `I` 只返回文学类）。
+- **Response**:
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": [
+    { "title": "三体全集", "author": "刘慈欣", "count": 428, "call_number": "I247.55/123", "category": "I" }
+  ]
+}
+```
 
 ---
 
@@ -208,16 +219,16 @@ data: {"type": "done"}
   "message": "success",
   "data": {
     "total_borrows": 36908,
-    "total_readers": 5120,
+    "total_readers": 3580,
     "total_titles": 22318,
-    "avg_borrow_per_reader": 7.2
+    "avg_borrow_per_reader": 10.31
   }
 }
 ```
 
 ### 5.2 热门图书与分类统计
-- `GET /api/admin/stats/hot-books?limit=10`
-- `GET /api/admin/stats/categories`
+- `GET /api/admin/stats/hot-books?limit=10` → `data: [{title, author?, count, call_number?, category?}]`
+- `GET /api/admin/stats/categories` → `data: [{category, category_name, count, share}]`
 - `GET /api/admin/stats/publishers`
 
 ### 5.3 AI 智能采购建议

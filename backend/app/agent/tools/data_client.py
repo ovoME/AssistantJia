@@ -78,6 +78,25 @@ MOCK_BORROWS: Dict[str, List[Dict[str, Any]]] = {
     ]
 }
 
+# 热门借阅榜（按借阅量倒序，供 /api/hot-books 与管理端热门榜使用）
+HOT_BOOKS = [
+    {"title": "三体全集", "author": "刘慈欣", "call_number": "I247.55/123", "category": "I", "count": 428},
+    {"title": "平凡的世界", "author": "路遥", "call_number": "I247.57/88", "category": "I", "count": 396},
+    {"title": "深入理解计算机系统", "author": "Randal E. Bryant", "call_number": "TP3/288", "category": "TP", "count": 312},
+    {"title": "Python编程：从入门到实践", "author": "Eric Matthes", "call_number": "TP311.56/45", "category": "TP", "count": 298},
+    {"title": "算法导论", "author": "Thomas H. Cormen", "call_number": "TP301.6/18", "category": "TP", "count": 289},
+    {"title": "微观经济学", "author": "范里安", "call_number": "F016/52", "category": "F", "count": 276},
+    {"title": "围城", "author": "钱锺书", "call_number": "I246.57/12", "category": "I", "count": 267},
+    {"title": "百年孤独", "author": "加西亚·马尔克斯", "call_number": "I775.45/1", "category": "I", "count": 254},
+    {"title": "被讨厌的勇气", "author": "岸见一郎", "call_number": "B848.4/19", "category": "B", "count": 235},
+    {"title": "经济学原理", "author": "曼昆", "call_number": "F0/65", "category": "F", "count": 231},
+    {"title": "人类简史", "author": "尤瓦尔·赫拉利", "call_number": "K109/4", "category": "K", "count": 218},
+    {"title": "高等数学辅导讲义", "author": "汤家凤", "call_number": "O13/99", "category": "O", "count": 205},
+    {"title": "陈嘉庚传", "author": "陈嘉庚研究会", "call_number": "K825.38/1", "category": "K", "count": 192},
+    {"title": "万历十五年", "author": "黄仁宇", "call_number": "K248.3/2", "category": "K", "count": 178},
+    {"title": "活着", "author": "余华", "call_number": "I247.57/901", "category": "I", "count": 349},
+]
+
 class DataClient:
     """数据客户端接口封装"""
 
@@ -177,6 +196,14 @@ class DataClient:
                 "reason": "经管大类高分必读书籍"
             }
         ][:limit]
+
+    @staticmethod
+    def get_hot_books(category: Optional[str] = None, limit: int = 10) -> List[Dict[str, Any]]:
+        """获取全馆借阅热门榜单（按借阅量倒序，支持按中图分类过滤）"""
+        books = HOT_BOOKS
+        if category:
+            books = [b for b in books if b.get("category") == category]
+        return sorted(books, key=lambda b: b["count"], reverse=True)[:limit]
 
     @staticmethod
     def search_rules_knowledge(question: str) -> Dict[str, Any]:
