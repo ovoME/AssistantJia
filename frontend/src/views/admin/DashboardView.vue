@@ -100,13 +100,23 @@ function renderCharts() {
   }
   if (pieChartRef.value) {
     pieChart = echarts.init(pieChartRef.value)
+    const totalCats = categories.value.reduce((s, c) => s + c.count, 0)
     pieChart.setOption({
       tooltip: { trigger: 'item' },
       legend: { bottom: 0, icon: 'circle', textStyle: { color: '#42545e', fontSize: 11 } },
+      title: {
+        text: totalCats.toLocaleString(),
+        subtext: '总借阅',
+        left: 'center',
+        top: '36%',
+        textAlign: 'center',
+        textStyle: { fontSize: 20, fontWeight: 700, color: '#16262e' },
+        subtextStyle: { fontSize: 11, color: '#6b7d87' },
+      },
       series: [
         {
           type: 'pie',
-          radius: ['42%', '68%'],
+          radius: ['48%', '70%'],
           center: ['50%', '44%'],
           data: categories.value.map((c, i) => ({
             name: c.category_name || c.category,
