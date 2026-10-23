@@ -1,0 +1,3 @@
+# 与 backend/requirements.txt 中的数据依赖下限保持一致。
+pandas>=2.2.0
+openpyxl>=3.1.2

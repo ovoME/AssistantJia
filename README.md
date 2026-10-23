@@ -119,6 +119,22 @@ npm run dev
 
 ---
 
+## 数据清洗与统计 C1
+
+在仓库根目录运行：
+
+```bash
+python -m pip install -r data/requirements.txt
+python -m data.scripts.generate_demo --rows 36908
+python -m data.scripts.clean_data --input data/demo/borrow_records_demo.csv --dataset-label simulated
+python -m data.scripts.analyze
+python -m unittest discover -s data/tests -v
+```
+
+清洗、质量报告和统计结果写入 `data/processed/`。输入字段、真实 Excel 导入及前端字段映射见 [数据模块说明](data/README.md) 和 [C1 数据交付约定](docs/c-data-contract.md)。模拟数据和生成结果由本地命令创建。
+
+---
+
 ## 🌿 Git 分支策略与协作规范
 
 团队采用标准 Git-Flow 精简工作流：

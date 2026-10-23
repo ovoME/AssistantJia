@@ -59,6 +59,11 @@ Thumbs.db
 # Data & Knowledge base (Exclude large raw files and local Chroma persistence)
 data/raw/*
 !data/raw/.gitkeep
+# C1 generated records, profiles and synthetic fixtures
+data/processed/*
+!data/processed/.gitkeep
+data/demo/*
+!data/demo/.gitkeep
 *.xlsx
 *.xls
 *.csv.gz
