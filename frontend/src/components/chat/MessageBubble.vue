@@ -1,9 +1,21 @@
 <script setup lang="ts">
 import type { ChatMessage } from '@/types'
 import BookCard from './BookCard.vue'
+import { useToast } from '@/composables/useToast'
 
-defineProps<{ message: ChatMessage; readerId?: string }>()
-defineEmits<{ retry: [id: string] }>()
+const props = defineProps<{ message: ChatMessage; readerId?: string }>()
+const emit = defineEmits<{ retry: [id: string] }>()
+const toast = useToast()
+
+async function copyText() {
+  if (!props.message.content) return
+  try {
+    await navigator.clipboard.writeText(props.message.content)
+    toast.success('已复制')
+  } catch {
+    toast.error('复制失败')
+  }
+}
 </script>
 
 <template>
@@ -18,10 +30,18 @@ defineEmits<{ retry: [id: string] }>()
         </div>
         <div v-if="message.thought && message.content" class="thought mini">{{ message.thought }}</div>
 
-        <div v-if="message.content" class="lg bubble-b cu-bubble-in">
-          <span class="lg-inner"></span>
-          <span class="content-text">{{ message.content }}</span>
-          <span v-if="message.streaming" class="cursor">▍</span>
+        <div v-if="message.content" class="bubble-wrap">
+          <div class="lg bubble-b cu-bubble-in">
+            <span class="lg-inner"></span>
+            <span class="content-text">{{ message.content }}</span>
+            <span v-if="message.streaming" class="cursor">▍</span>
+          </div>
+          <button class="copy-btn" @click="copyText" title="复制内容">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+              <rect x="9" y="9" width="12" height="12" rx="2" stroke="currentColor" stroke-width="2"/>
+              <path d="M5 15V5a2 2 0 0 1 2-2h10" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </button>
         </div>
         <div v-else-if="message.streaming && !message.thought" class="lg bubble-b think cu-bubble-in">
           <span class="lg-inner"></span>
@@ -45,7 +65,15 @@ defineEmits<{ retry: [id: string] }>()
     <!-- 用户 -->
     <template v-else>
       <div class="col user-col">
-        <div class="bubble-u cu-bubble-in">{{ message.content }}</div>
+        <div class="bubble-wrap user-wrap">
+          <div class="bubble-u cu-bubble-in">{{ message.content }}</div>
+          <button class="copy-btn" @click="copyText" title="复制内容">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+              <rect x="9" y="9" width="12" height="12" rx="2" stroke="currentColor" stroke-width="2"/>
+              <path d="M5 15V5a2 2 0 0 1 2-2h10" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </button>
+        </div>
         <div v-if="message.timestamp" class="ts">{{ message.timestamp }}</div>
       </div>
       <div class="avatar user">我</div>
@@ -117,4 +145,17 @@ defineEmits<{ retry: [id: string] }>()
 .retry-ic { font-size: 14px; }
 .retry-tip { font-size: 13px; color: #d15b4f; flex: 1; min-width: 140px; }
 .ts { font-size: 11px; color: var(--ink-3); margin-top: 4px; opacity: 0.8; }
+
+.bubble-wrap { display: flex; align-items: center; gap: 4px; }
+.user-wrap { justify-content: flex-end; }
+.copy-btn {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  color: var(--ink-3);
+  padding: 3px;
+  border-radius: 6px;
+  flex: 0 0 auto;
+}
+.bubble-wrap:hover .copy-btn { opacity: 0.6; }
+.copy-btn:hover { opacity: 1 !important; color: var(--ink-2); background: rgba(0,0,0,0.05); }
 </style>

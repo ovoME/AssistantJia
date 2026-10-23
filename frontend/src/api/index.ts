@@ -23,6 +23,7 @@ import {
   mockSummary,
   mockHotBooks,
   mockCategories,
+  mockPublishers,
   mockSseChunks,
   mockAdvice,
 } from '@/mock/data'
@@ -129,6 +130,15 @@ export async function getCategories(): Promise<CategoryStat[]> {
     return mockCategories
   }
   return http.get<unknown, CategoryStat[]>('/admin/stats/categories')
+}
+
+/** 出版社 TOP10（待后端契约：GET /api/admin/stats/publishers） */
+export async function getPublishers(limit = 10): Promise<BookStat[]> {
+  if (USE_MOCK) {
+    await delay(200)
+    return mockPublishers.slice(0, limit)
+  }
+  return http.get<unknown, BookStat[]>('/admin/stats/publishers', { params: { limit } })
 }
 
 /** AI 智能采购建议（契约 5.3：POST /api/admin/purchase-advice） */

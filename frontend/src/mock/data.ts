@@ -107,6 +107,19 @@ export const mockCategories: CategoryStat[] = [
   { category: 'J', category_name: '艺术', count: 620 },
 ]
 
+export const mockPublishers: BookStat[] = [
+  { title: '机械工业出版社', author: '', count: 1820 },
+  { title: '高等教育出版社', author: '', count: 1560 },
+  { title: '电子工业出版社', author: '', count: 1240 },
+  { title: '人民邮电出版社', author: '', count: 980 },
+  { title: '清华大学出版社', author: '', count: 860 },
+  { title: '商务印书馆', author: '', count: 720 },
+  { title: '科学出版社', author: '', count: 640 },
+  { title: '中信出版社', author: '', count: 520 },
+  { title: '人民文学出版社', author: '', count: 480 },
+  { title: '上海译文出版社', author: '', count: 410 },
+]
+
 /** 模拟 SSE 流式回复（把一段文字逐段返回，模拟打字机） */
 export function mockSseChunks(fullText: string, cards: Book[] = []): string[] {
   const chunks: string[] = []

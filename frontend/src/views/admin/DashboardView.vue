@@ -3,7 +3,7 @@ import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import echarts from '@/utils/echarts'
 import type { ECharts } from '@/utils/echarts'
-import { getAdminSummary, getHotBooks, getCategories, getPurchaseAdvice } from '@/api'
+import { getAdminSummary, getHotBooks, getCategories, getPublishers, getPurchaseAdvice } from '@/api'
 import type { AdminSummary, BookStat, CategoryStat } from '@/types'
 import { useToast } from '@/composables/useToast'
 import CuState from '@/components/cu/CuState.vue'
@@ -20,11 +20,14 @@ const summary = ref<AdminSummary>({
 })
 const hotBooks = ref<BookStat[]>([])
 const categories = ref<CategoryStat[]>([])
+const publishers = ref<BookStat[]>([])
 
 const hotChartRef = ref<HTMLElement | null>(null)
 const pieChartRef = ref<HTMLElement | null>(null)
+const publisherChartRef = ref<HTMLElement | null>(null)
 let hotChart: ECharts | null = null
 let pieChart: ECharts | null = null
+let publisherChart: ECharts | null = null
 
 const adviceLoading = ref(false)
 const advice = ref('')
@@ -36,10 +39,11 @@ async function loadData() {
   loading.value = true
   error.value = ''
   try {
-    const [s, h, c] = await Promise.all([getAdminSummary(), getHotBooks(8), getCategories()])
+    const [s, h, c, p] = await Promise.all([getAdminSummary(), getHotBooks(8), getCategories(), getPublishers(10)])
     summary.value = s
     hotBooks.value = h
     categories.value = c
+    publishers.value = p
     // 先关闭 loading，让内容区（含图表容器）真正渲染进 DOM，再 nextTick 初始化图表
     loading.value = false
     await nextTick()
@@ -110,11 +114,69 @@ function renderCharts() {
       ],
     })
   }
+  // 出版社 TOP10 横条图
+  if (publisherChartRef.value) {
+    publisherChart = echarts.init(publisherChartRef.value)
+    const names = publishers.value.map((p) => p.title)
+    const counts = publishers.value.map((p) => p.count)
+    publisherChart.setOption({
+      grid: { left: 10, right: 36, top: 16, bottom: 10, containLabel: true },
+      tooltip: { trigger: 'axis' },
+      xAxis: {
+        type: 'value',
+        splitLine: { lineStyle: { color: 'rgba(20,40,55,0.08)' } },
+        axisLabel: { color: '#6b7d87' },
+      },
+      yAxis: {
+        type: 'category',
+        data: names.slice().reverse(),
+        axisLine: { lineStyle: { color: '#c2ccd2' } },
+        axisLabel: { color: '#42545e', fontSize: 11 },
+      },
+      series: [
+        {
+          type: 'bar',
+          data: counts.slice().reverse(),
+          barWidth: '58%',
+          itemStyle: {
+            borderRadius: [0, 8, 8, 0],
+            color: {
+              type: 'linear',
+              x: 0, y: 0, x2: 1, y2: 0,
+              colorStops: [
+                { offset: 0, color: '#93c5fd' },
+                { offset: 1, color: '#007aff' },
+              ],
+            },
+          },
+          label: { show: true, position: 'right', fontSize: 11, color: '#42545e' },
+        },
+      ],
+    })
+  }
 }
 
 function resize() {
   hotChart?.resize()
   pieChart?.resize()
+  publisherChart?.resize()
+}
+
+function exportHotBooks() {
+  if (!hotBooks.value.length) return
+  const header = '排名,书名,作者,借阅次数\n'
+  const rows = hotBooks.value
+    .map((b, i) => `${i + 1},"${b.title}","${b.author || ''}",${b.count}`)
+    .join('\n')
+  const csv = '\uFEFF' + header + rows
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `热门图书TOP8_${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+  toast.success('CSV 已导出')
 }
 
 async function genAdvice() {
@@ -144,6 +206,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', resize)
   hotChart?.dispose()
   pieChart?.dispose()
+  publisherChart?.dispose()
 })
 </script>
 
@@ -181,6 +244,10 @@ onBeforeUnmount(() => {
             <div class="sk sk-chart"></div>
           </div>
         </div>
+        <div class="lg-panel chart-card skeleton-block">
+          <div class="sk sk-title"></div>
+          <div class="sk sk-chart"></div>
+        </div>
       </template>
       <CuState v-else-if="error" type="error" :message="error" @retry="loadData" />
       <template v-else>
@@ -205,7 +272,10 @@ onBeforeUnmount(() => {
 
         <div class="chart-row">
           <div class="lg-panel chart-card cu-pop" style="animation-delay:0.12s">
-            <h3>热门图书 TOP8</h3>
+            <div class="card-head">
+              <h3>热门图书 TOP8</h3>
+              <button class="cu-btn cu-btn-plain cu-btn-sm" @click="exportHotBooks">导出 CSV</button>
+            </div>
             <div class="chart-wrap">
               <div ref="hotChartRef" class="chart tall"></div>
               <div v-if="!hotBooks.length" class="chart-empty">暂无热门图书数据</div>
@@ -217,6 +287,14 @@ onBeforeUnmount(() => {
               <div ref="pieChartRef" class="chart tall"></div>
               <div v-if="!categories.length" class="chart-empty">暂无分类数据</div>
             </div>
+          </div>
+        </div>
+
+        <div class="lg-panel chart-card cu-pop" style="animation-delay:0.26s">
+          <h3>出版社 TOP10</h3>
+          <div class="chart-wrap">
+            <div ref="publisherChartRef" class="chart tall"></div>
+            <div v-if="!publishers.length" class="chart-empty">暂无出版社数据</div>
           </div>
         </div>
 
@@ -308,6 +386,8 @@ onBeforeUnmount(() => {
 }
 .chart-card { padding: 18px 18px 12px; }
 .chart-card h3 { font-size: 15px; font-weight: 700; color: var(--ink); margin: 0 0 8px; }
+.card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.card-head h3 { margin: 0; }
 .chart-wrap { position: relative; }
 .chart { width: 100%; height: 320px; }
 .chart.tall { height: 340px; }
