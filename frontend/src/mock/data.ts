@@ -5,6 +5,7 @@ import type {
   AdminSummary,
   CategoryStat,
   BookStat,
+  BorrowTrendPoint,
 } from '../types'
 
 /**
@@ -145,3 +146,22 @@ export const mockAdvice = `【小嘉智能采购建议 · 基于36,908条借阅�
 3. 冷门调架：部分文学旧书（I类早期版本）借阅量为0，建议结合馆藏年限评估剔旧或移至密集书库，释放黄金架位。
 
 4. 馆藏结构：文学类（I）占比最高，工业技术（T）次之，建议保持工程类新书采购节奏，并增加计算机（TP311/TP312）类前沿图书以匹配学生技术学习需求。`
+
+/** 近30天每日借阅量趋势 */
+export const mockBorrowTrend: BorrowTrendPoint[] = (() => {
+  const points: BorrowTrendPoint[] = []
+  const today = new Date()
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(today)
+    d.setDate(d.getDate() - i)
+    const dow = d.getDay()
+    // 周末低、工作日高，期末前更高
+    const base = dow === 0 || dow === 6 ? 30 : 80
+    const noise = Math.round((Math.sin(i * 1.3) + Math.cos(i * 0.7)) * 15)
+    points.push({
+      date: `${d.getMonth() + 1}/${d.getDate()}`,
+      count: Math.max(15, base + noise),
+    })
+  }
+  return points
+})()

@@ -14,6 +14,7 @@ import type {
   AdminSummary,
   CategoryStat,
   BookStat,
+  BorrowTrendPoint,
 } from '@/types'
 import {
   USE_MOCK,
@@ -24,6 +25,7 @@ import {
   mockHotBooks,
   mockCategories,
   mockPublishers,
+  mockBorrowTrend,
   mockSseChunks,
   mockAdvice,
 } from '@/mock/data'
@@ -139,6 +141,15 @@ export async function getPublishers(limit = 10): Promise<BookStat[]> {
     return mockPublishers.slice(0, limit)
   }
   return http.get<unknown, BookStat[]>('/admin/stats/publishers', { params: { limit } })
+}
+
+/** 借阅趋势：近N天每日借阅量（待后端契约：GET /api/admin/stats/trend） */
+export async function getBorrowTrend(days = 30): Promise<BorrowTrendPoint[]> {
+  if (USE_MOCK) {
+    await delay(200)
+    return mockBorrowTrend.slice(-days)
+  }
+  return http.get<unknown, BorrowTrendPoint[]>('/admin/stats/trend', { params: { days } })
 }
 
 /** AI 智能采购建议（契约 5.3：POST /api/admin/purchase-advice） */

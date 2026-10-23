@@ -3,8 +3,8 @@ import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import echarts from '@/utils/echarts'
 import type { ECharts } from '@/utils/echarts'
-import { getAdminSummary, getHotBooks, getCategories, getPublishers, getPurchaseAdvice } from '@/api'
-import type { AdminSummary, BookStat, CategoryStat } from '@/types'
+import { getAdminSummary, getHotBooks, getCategories, getPublishers, getBorrowTrend, getPurchaseAdvice } from '@/api'
+import type { AdminSummary, BookStat, CategoryStat, BorrowTrendPoint } from '@/types'
 import { useToast } from '@/composables/useToast'
 import CuState from '@/components/cu/CuState.vue'
 
@@ -21,13 +21,16 @@ const summary = ref<AdminSummary>({
 const hotBooks = ref<BookStat[]>([])
 const categories = ref<CategoryStat[]>([])
 const publishers = ref<BookStat[]>([])
+const trend = ref<BorrowTrendPoint[]>([])
 
 const hotChartRef = ref<HTMLElement | null>(null)
 const pieChartRef = ref<HTMLElement | null>(null)
 const publisherChartRef = ref<HTMLElement | null>(null)
+const trendChartRef = ref<HTMLElement | null>(null)
 let hotChart: ECharts | null = null
 let pieChart: ECharts | null = null
 let publisherChart: ECharts | null = null
+let trendChart: ECharts | null = null
 
 const adviceLoading = ref(false)
 const advice = ref('')
@@ -39,11 +42,12 @@ async function loadData() {
   loading.value = true
   error.value = ''
   try {
-    const [s, h, c, p] = await Promise.all([getAdminSummary(), getHotBooks(8), getCategories(), getPublishers(10)])
+    const [s, h, c, p, t] = await Promise.all([getAdminSummary(), getHotBooks(8), getCategories(), getPublishers(10), getBorrowTrend(30)])
     summary.value = s
     hotBooks.value = h
     categories.value = c
     publishers.value = p
+    trend.value = t
     // 先关闭 loading，让内容区（含图表容器）真正渲染进 DOM，再 nextTick 初始化图表
     loading.value = false
     await nextTick()
@@ -154,12 +158,50 @@ function renderCharts() {
       ],
     })
   }
+  // 借阅趋势折线图（近30天）
+  if (trendChartRef.value) {
+    trendChart = echarts.init(trendChartRef.value)
+    trendChart.setOption({
+      grid: { left: 10, right: 20, top: 20, bottom: 10, containLabel: true },
+      tooltip: { trigger: 'axis' },
+      xAxis: {
+        type: 'category',
+        data: trend.value.map((p) => p.date),
+        axisLine: { lineStyle: { color: '#c2ccd2' } },
+        axisLabel: { color: '#6b7d87', fontSize: 10, interval: 4 },
+      },
+      yAxis: {
+        type: 'value',
+        splitLine: { lineStyle: { color: 'rgba(20,40,55,0.08)' } },
+        axisLabel: { color: '#6b7d87', fontSize: 11 },
+      },
+      series: [
+        {
+          type: 'line',
+          data: trend.value.map((p) => p.count),
+          smooth: true,
+          symbol: 'none',
+          lineStyle: { width: 2.5, color: '#0f9d8f' },
+          areaStyle: {
+            color: {
+              type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+              colorStops: [
+                { offset: 0, color: 'rgba(20,184,166,0.25)' },
+                { offset: 1, color: 'rgba(20,184,166,0)' },
+              ],
+            },
+          },
+        },
+      ],
+    })
+  }
 }
 
 function resize() {
   hotChart?.resize()
   pieChart?.resize()
   publisherChart?.resize()
+  trendChart?.resize()
 }
 
 function exportHotBooks() {
@@ -207,6 +249,7 @@ onBeforeUnmount(() => {
   hotChart?.dispose()
   pieChart?.dispose()
   publisherChart?.dispose()
+  trendChart?.dispose()
 })
 </script>
 
@@ -233,6 +276,10 @@ onBeforeUnmount(() => {
             <div class="sk sk-num"></div>
             <div class="sk sk-label"></div>
           </div>
+        </div>
+        <div class="lg-panel chart-card skeleton-block">
+          <div class="sk sk-title"></div>
+          <div class="sk sk-chart"></div>
         </div>
         <div class="chart-row">
           <div class="lg-panel chart-card skeleton-block">
@@ -267,6 +314,14 @@ onBeforeUnmount(() => {
             <div class="stat-ico" :style="{ background: s.color + '22', color: s.color }">{{ s.icon }}</div>
             <div class="stat-num" :style="{ color: s.color }">{{ s.value }}</div>
             <div class="stat-label">{{ s.label }}</div>
+          </div>
+        </div>
+
+        <div class="lg-panel chart-card cu-pop" style="animation-delay:0.08s">
+          <h3>近30天借阅趋势</h3>
+          <div class="chart-wrap">
+            <div ref="trendChartRef" class="chart"></div>
+            <div v-if="!trend.length" class="chart-empty">暂无趋势数据</div>
           </div>
         </div>
 

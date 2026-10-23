@@ -3,7 +3,7 @@
  * 用法：`import echarts, { type ECharts } from '@/utils/echarts'`
  */
 import * as echarts from 'echarts/core'
-import { BarChart, PieChart } from 'echarts/charts'
+import { BarChart, PieChart, LineChart } from 'echarts/charts'
 import {
   GridComponent,
   TooltipComponent,
@@ -14,6 +14,7 @@ import { CanvasRenderer } from 'echarts/renderers'
 echarts.use([
   BarChart,
   PieChart,
+  LineChart,
   GridComponent,
   TooltipComponent,
   LegendComponent,

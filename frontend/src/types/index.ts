@@ -94,3 +94,9 @@ export interface BookStat {
   author?: string
   count: number
 }
+
+/** 借阅趋势数据点 */
+export interface BorrowTrendPoint {
+  date: string
+  count: number
+}
