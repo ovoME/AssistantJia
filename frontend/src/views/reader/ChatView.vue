@@ -336,6 +336,8 @@ async function onRenew(book: BorrowRecord) {
 .rec-author { font-size: 12px; color: var(--ink-3); }
 .rec-reason { font-size: 12px; color: var(--ink-2); line-height: 1.5; margin-top: 4px; }
 
+.quick-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+
 /* 馆藏搜索 */
 .search-btn { display: inline-flex; align-items: center; gap: 4px; }
 .search-box {

@@ -264,7 +264,12 @@ onBeforeUnmount(() => {
           <div class="brand-sub">运营数据 · 仅馆员可见</div>
         </div>
       </div>
-      <button class="cu-btn cu-btn-plain" @click="router.push('/')">返回读者端</button>
+      <div class="topbar-actions">
+        <button class="cu-btn cu-btn-plain" @click="loadData" :disabled="loading">
+          {{ loading ? '刷新中…' : '刷新数据' }}
+        </button>
+        <button class="cu-btn cu-btn-plain" @click="router.push('/')">返回读者端</button>
+      </div>
     </header>
 
     <div class="content">
@@ -392,6 +397,7 @@ onBeforeUnmount(() => {
   padding: 10px 18px;
   min-height: 60px;
 }
+.topbar-actions { display: flex; gap: 8px; align-items: center; }
 .brand { display: flex; align-items: center; gap: 12px; }
 .logo {
   width: 42px; height: 42px; border-radius: 50%;
