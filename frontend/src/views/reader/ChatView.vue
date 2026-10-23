@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { ref, nextTick, watch } from 'vue'
+import { ref, nextTick, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
 import ChatInput from '@/components/chat/ChatInput.vue'
 import CuSheet from '@/components/cu/CuSheet.vue'
-import { getMyBorrows, renewBook } from '@/api'
-import type { BorrowRecord } from '@/types'
+import CuState from '@/components/cu/CuState.vue'
+import BookCard from '@/components/chat/BookCard.vue'
+import { getMyBorrows, renewBook, getRecommend, searchBooks } from '@/api'
+import type { BorrowRecord, RecommendBook, Book } from '@/types'
 import { useToast } from '@/composables/useToast'
 
 const router = useRouter()
@@ -16,9 +18,49 @@ const toast = useToast()
 const sheetShow = ref(false)
 const borrows = ref<BorrowRecord[]>([])
 const borrowLoading = ref(false)
+const borrowError = ref('')
+const recommends = ref<RecommendBook[]>([])
+
+// 馆藏搜索
+const searchShow = ref(false)
+const searchQuery = ref('')
+const searchResults = ref<Book[]>([])
+const searchLoading = ref(false)
+const searchSearched = ref(false)
 
 const quickQuestions = ['帮我找《三体》', '图书能借多少天？', '怎么续借？', '我想找物流相关的书']
 const messagesEl = ref<HTMLElement | null>(null)
+
+onMounted(async () => {
+  try {
+    recommends.value = await getRecommend(chat.readerId, 4)
+  } catch {
+    // 推荐位加载失败静默忽略
+  }
+})
+
+async function doSearch() {
+  const q = searchQuery.value.trim()
+  if (!q) return
+  searchLoading.value = true
+  searchSearched.value = true
+  try {
+    searchResults.value = await searchBooks(q, 8)
+  } catch (e) {
+    toast.error((e as Error).message || '搜索失败，请稍后重试')
+    searchResults.value = []
+  } finally {
+    searchLoading.value = false
+  }
+}
+
+// 搜索模态打开时自动聚焦输入框
+watch(searchShow, async (v) => {
+  if (v) {
+    await nextTick()
+    document.querySelector<HTMLInputElement>('.search-input')?.focus()
+  }
+})
 
 async function scrollToBottom() {
   await nextTick()
@@ -38,14 +80,21 @@ async function onSend(text: string) {
 async function openBorrows() {
   sheetShow.value = true
   borrowLoading.value = true
+  borrowError.value = ''
   try {
     borrows.value = await getMyBorrows(chat.readerId)
   } catch (e) {
-    toast.error((e as Error).message || '借阅记录加载失败')
+    borrowError.value = (e as Error).message || '借阅记录加载失败，请稍后重试'
   } finally {
     borrowLoading.value = false
   }
 }
+function isDueSoon(b: BorrowRecord): boolean {
+  if (b.is_overdue) return false
+  const days = Math.ceil((new Date(b.due_date).getTime() - Date.now()) / 86400000)
+  return days <= 7
+}
+
 async function onRenew(book: BorrowRecord) {
   try {
     const r = await renewBook(chat.readerId, book.book_id)
@@ -72,6 +121,14 @@ async function onRenew(book: BorrowRecord) {
         </div>
       </div>
       <div class="actions">
+        <button class="cu-btn cu-btn-plain search-btn" @click="searchShow = true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
+            <path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          搜书
+        </button>
+        <button v-if="chat.messages.length" class="cu-btn cu-btn-plain" @click="chat.reset()">新对话</button>
         <button class="cu-btn cu-btn-plain" @click="openBorrows">我的借阅</button>
         <button class="cu-btn cu-btn-plain" @click="router.push('/admin')">管理端</button>
       </div>
@@ -96,6 +153,24 @@ async function onRenew(book: BorrowRecord) {
             <span class="lg-inner"></span>{{ q }}
           </button>
         </div>
+
+        <!-- 个性化推荐（仅在欢迎页展示） -->
+        <div v-if="recommends.length" class="recommend cu-fade-in" style="animation-delay: 0.5s">
+          <div class="rec-title">✨ 为你推荐</div>
+          <div class="rec-row">
+            <button
+              v-for="r in recommends"
+              :key="r.isbn"
+              class="lg lg-tap rec-card"
+              @click="onSend(`我想找《${r.title}》`)"
+            >
+              <span class="lg-inner"></span>
+              <div class="rec-book">{{ r.title }}</div>
+              <div class="rec-author">{{ r.author }}</div>
+              <div class="rec-reason">{{ r.reason }}</div>
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- 消息流 -->
@@ -104,6 +179,7 @@ async function onRenew(book: BorrowRecord) {
         :key="m.id"
         :message="m"
         :reader-id="chat.readerId"
+        @retry="chat.retry"
       />
     </main>
 
@@ -114,17 +190,15 @@ async function onRenew(book: BorrowRecord) {
 
     <!-- 我的借阅 -->
     <CuSheet v-model="sheetShow" title="我的借阅">
-      <div v-if="borrowLoading" class="loading-line">
-        <span class="cu-spinner"><span></span><span></span><span></span></span>
-        正在加载借阅记录…
-      </div>
+      <CuState v-if="borrowLoading" type="loading" message="正在加载借阅记录…" />
+      <CuState v-else-if="borrowError" type="error" :message="borrowError" @retry="openBorrows" />
       <div v-else-if="borrows.length" class="borrow-list">
         <div v-for="b in borrows" :key="b.book_id" class="borrow-item lg-panel">
           <div class="b-title">{{ b.title }}</div>
           <div class="b-meta">
             <span>应还：{{ b.due_date }}</span>
-            <span class="cu-tag" :class="b.is_overdue ? 'cu-tag-red' : 'cu-tag-green'">
-              {{ b.is_overdue ? '已逾期' : '借阅中' }}
+            <span class="cu-tag" :class="b.is_overdue ? 'cu-tag-red' : isDueSoon(b) ? 'cu-tag-orange' : 'cu-tag-green'">
+              {{ b.is_overdue ? '已逾期' : isDueSoon(b) ? '即将到期' : '借阅中' }}
             </span>
           </div>
           <div class="b-meta">已续借 {{ b.renew_count }} 次</div>
@@ -137,7 +211,30 @@ async function onRenew(book: BorrowRecord) {
           </button>
         </div>
       </div>
-      <div v-else class="empty">暂无借阅记录，问问小嘉找本书吧～</div>
+      <CuState v-else type="empty" message="暂无借阅记录，问问小嘉找本书吧～" />
+    </CuSheet>
+
+    <!-- 馆藏搜索 -->
+    <CuSheet v-model="searchShow" title="馆藏搜索">
+      <div class="search-box lg lg-r14">
+        <span class="lg-inner"></span>
+        <input
+          v-model="searchQuery"
+          class="search-input"
+          placeholder="输入书名 / 作者 / 关键词…"
+          @keydown.enter="doSearch"
+        />
+        <button class="cu-btn cu-btn-teal cu-btn-sm" @click="doSearch" :disabled="!searchQuery.trim()">搜索</button>
+      </div>
+
+      <CuState v-if="searchLoading" type="loading" message="正在检索馆藏…" />
+      <template v-else-if="searchSearched">
+        <div v-if="searchResults.length" class="search-results">
+          <BookCard v-for="b in searchResults" :key="b.isbn" :book="b" :reader-id="chat.readerId" />
+        </div>
+        <CuState v-else type="empty" message="没找到相关图书，换个关键词试试，或直接问小嘉～" />
+      </template>
+      <CuState v-else type="empty" message="输入关键词开始检索馆藏" />
     </CuSheet>
   </div>
 </template>
@@ -220,4 +317,52 @@ async function onRenew(book: BorrowRecord) {
 .b-title { font-size: 15px; font-weight: 600; margin-bottom: 8px; color: var(--ink); }
 .b-meta { display: flex; align-items: center; gap: 10px; color: var(--ink-3); font-size: 13px; margin-bottom: 8px; }
 .empty { text-align: center; color: var(--ink-3); padding: 26px 0; }
+
+/* 个性化推荐位 */
+.recommend { width: 100%; max-width: 560px; }
+.rec-title { font-size: 14px; font-weight: 700; color: var(--ink-2); margin-bottom: 12px; }
+.rec-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scroll-snap-type: x mandatory;
+}
+.rec-card {
+  flex: 0 0 200px;
+  scroll-snap-align: start;
+  padding: 14px 16px;
+  border-radius: 18px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: inset 0 1.5px 1px rgba(255,255,255,1), 0 4px 12px rgba(20,50,60,0.08);
+}
+.rec-book { font-size: 14px; font-weight: 700; color: var(--ink); line-height: 1.4; }
+.rec-author { font-size: 12px; color: var(--ink-3); }
+.rec-reason { font-size: 12px; color: var(--ink-2); line-height: 1.5; margin-top: 4px; }
+
+.quick-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+
+/* 馆藏搜索 */
+.search-btn { display: inline-flex; align-items: center; gap: 4px; }
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 6px 16px;
+  margin-bottom: 16px;
+}
+.search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 15px;
+  color: var(--ink);
+  padding: 8px 0;
+}
+.search-input::placeholder { color: var(--ink-3); }
+.search-results { display: flex; flex-direction: column; gap: 12px; }
 </style>

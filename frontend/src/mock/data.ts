@@ -5,13 +5,14 @@ import type {
   AdminSummary,
   CategoryStat,
   BookStat,
+  BorrowTrendPoint,
 } from '../types'
 
 /**
  * Mock 数据：后端（A）还没写好前，前端用它独立开发。
- * 后端接口就绪后，把 api 层的 USE_MOCK 关掉即可，无需改组件。
+ * 后端接口就绪后，在 `.env.local` 里设 VITE_USE_MOCK=false 即可关闭，无需改源码。
  */
-export const USE_MOCK = true
+export const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
 
 export const mockBooks: Book[] = [
   {
@@ -101,10 +102,23 @@ export const mockCategories: CategoryStat[] = [
   { category: 'I', category_name: '文学', count: 4213 },
   { category: 'T', category_name: '工业技术', count: 2890 },
   { category: 'F', category_name: '经济', count: 1640 },
-  { category: 'B', category_name: '哲学/心理', count: 1180 },
-  { category: 'H', category_name: '语言文字', count: 960 },
-  { category: 'C', category_name: '社会科学', count: 834 },
+  { category: 'B', category_name: '哲学', count: 1180 },
+  { category: 'H', category_name: '语言', count: 960 },
+  { category: 'C', category_name: '社科', count: 834 },
   { category: 'J', category_name: '艺术', count: 620 },
+]
+
+export const mockPublishers: BookStat[] = [
+  { title: '机械工业出版社', author: '', count: 1820 },
+  { title: '高等教育出版社', author: '', count: 1560 },
+  { title: '电子工业出版社', author: '', count: 1240 },
+  { title: '人民邮电出版社', author: '', count: 980 },
+  { title: '清华大学出版社', author: '', count: 860 },
+  { title: '商务印书馆', author: '', count: 720 },
+  { title: '科学出版社', author: '', count: 640 },
+  { title: '中信出版社', author: '', count: 520 },
+  { title: '人民文学出版社', author: '', count: 480 },
+  { title: '上海译文出版社', author: '', count: 410 },
 ]
 
 /** 模拟 SSE 流式回复（把一段文字逐段返回，模拟打字机） */
@@ -121,3 +135,33 @@ export function mockSseChunks(fullText: string, cards: Book[] = []): string[] {
   chunks.push(JSON.stringify({ type: 'done' }))
   return chunks
 }
+
+/** AI 智能采购建议（对应 POST /api/admin/purchase-advice，契约 5.3） */
+export const mockAdvice = `【小嘉智能采购建议 · 基于36,908条借阅数据】
+
+1. 复购建议：建筑/土木类（TU、U类）借阅高度集中，其中《聚丙烯纤维混凝土抗裂防渗性能研究与施工工法》《砌筑工》等热门书借阅量达30+次且可借副本不足，建议各增购3-5本，缓解排队。
+
+2. 学科缺口：物流管理（F252/F253）相关图书借阅集中且复借率高，说明该专业课程需求旺盛，建议围绕冷链物流、仓储管理、物流装备补充新版教材与实务类图书。
+
+3. 冷门调架：部分文学旧书（I类早期版本）借阅量为0，建议结合馆藏年限评估剔旧或移至密集书库，释放黄金架位。
+
+4. 馆藏结构：文学类（I）占比最高，工业技术（T）次之，建议保持工程类新书采购节奏，并增加计算机（TP311/TP312）类前沿图书以匹配学生技术学习需求。`
+
+/** 近30天每日借阅量趋势 */
+export const mockBorrowTrend: BorrowTrendPoint[] = (() => {
+  const points: BorrowTrendPoint[] = []
+  const today = new Date()
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(today)
+    d.setDate(d.getDate() - i)
+    const dow = d.getDay()
+    // 周末低、工作日高，期末前更高
+    const base = dow === 0 || dow === 6 ? 30 : 80
+    const noise = Math.round((Math.sin(i * 1.3) + Math.cos(i * 0.7)) * 15)
+    points.push({
+      date: `${d.getMonth() + 1}/${d.getDate()}`,
+      count: Math.max(15, base + noise),
+    })
+  }
+  return points
+})()
