@@ -217,3 +217,21 @@ textarea { font-family: inherit; }
   .cu-pop, .cu-bubble-in, .cu-fade-in { animation: cu-fade 0.2s ease both !important; }
   .cu-spinner span, .cu-spin-ring { animation: none; }
 }
+
+/* ==================== 细滚动条（贴合玻璃质感） ==================== */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(107, 125, 135, 0.28);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(107, 125, 135, 0.45); background-clip: content-box; }
+html { scrollbar-width: thin; scrollbar-color: rgba(107, 125, 135, 0.3) transparent; }
+
+/* ==================== 按钮 hover 亮度 ==================== */
+.cu-btn-primary:hover, .cu-btn-teal:hover { filter: brightness(1.06); }
+.cu-btn-plain:hover { color: var(--ios-blue-hi); }
+
+/* 可点击玻璃：hover 微微上浮已在 .lg-tap 定义 */

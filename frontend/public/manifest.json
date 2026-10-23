@@ -1,0 +1,18 @@
+{
+  "name": "小嘉 · 图书馆智能馆员",
+  "short_name": "小嘉",
+  "description": "图书馆 AI 智能体：查馆藏、找架位、续借、预约、AI 采购建议",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f7f8",
+  "theme_color": "#0f9d8f",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

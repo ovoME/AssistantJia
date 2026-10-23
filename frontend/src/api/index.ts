@@ -1,6 +1,7 @@
 /**
  * 业务接口统一出口。
- * 后端未就绪时走 mock（USE_MOCK=true）；A 的后端好了之后把 mock/data.ts 的 USE_MOCK 改成 false。
+ * 后端未就绪时走 mock（VITE_USE_MOCK=true，默认开启）；
+ * A 的后端好了之后在 .env.local 设 VITE_USE_MOCK=false，无需改源码。
  */
 import { http, streamChat } from './request'
 import type {
@@ -13,6 +14,7 @@ import type {
   AdminSummary,
   CategoryStat,
   BookStat,
+  BorrowTrendPoint,
 } from '@/types'
 import {
   USE_MOCK,
@@ -22,7 +24,10 @@ import {
   mockSummary,
   mockHotBooks,
   mockCategories,
+  mockPublishers,
+  mockBorrowTrend,
   mockSseChunks,
+  mockAdvice,
 } from '@/mock/data'
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -61,12 +66,13 @@ export async function sendChat(
 export async function searchBooks(query: string, limit = 5): Promise<Book[]> {
   if (USE_MOCK) {
     await delay(300)
-    return mockBooks.filter(
+    const hit = mockBooks.filter(
       (b) => b.title.includes(query) || b.author.includes(query) || b.call_number.includes(query),
-    ).slice(0, limit) || mockBooks.slice(0, limit)
+    )
+    // 命中为空时回退到前 limit 本，避免搜不到直接返回空数组
+    return (hit.length ? hit : mockBooks.slice(0, limit)).slice(0, limit)
   }
-  const r = await http.get('/books/search', { params: { query, limit } })
-  return (r as any).data
+  return http.get<unknown, Book[]>('/books/search', { params: { query, limit } })
 }
 
 /* ---------- 借阅 ---------- */
@@ -75,8 +81,7 @@ export async function getMyBorrows(readerId: string): Promise<BorrowRecord[]> {
     await delay(200)
     return mockBorrows
   }
-  const r = await http.get(`/reader/${readerId}/borrows`)
-  return (r as any).data
+  return http.get<unknown, BorrowRecord[]>(`/reader/${readerId}/borrows`)
 }
 
 export async function renewBook(readerId: string, bookId: string): Promise<RenewResult> {
@@ -84,8 +89,7 @@ export async function renewBook(readerId: string, bookId: string): Promise<Renew
     await delay(400)
     return { new_due_date: '2026-12-01', renew_count: 1 }
   }
-  const r = await http.post('/renew', { reader_id: readerId, book_id: bookId })
-  return (r as any).data
+  return http.post<unknown, RenewResult>('/renew', { reader_id: readerId, book_id: bookId })
 }
 
 export async function reserveBook(readerId: string, isbn: string): Promise<ReserveResult> {
@@ -93,8 +97,7 @@ export async function reserveBook(readerId: string, isbn: string): Promise<Reser
     await delay(400)
     return { queue_position: 1, notify_channel: '站内消息' }
   }
-  const r = await http.post('/reserve', { reader_id: readerId, isbn })
-  return (r as any).data
+  return http.post<unknown, ReserveResult>('/reserve', { reader_id: readerId, isbn })
 }
 
 /* ---------- 推荐 ---------- */
@@ -103,8 +106,7 @@ export async function getRecommend(readerId: string, limit = 5): Promise<Recomme
     await delay(200)
     return mockRecommend.slice(0, limit)
   }
-  const r = await http.get('/recommend', { params: { reader_id: readerId, limit } })
-  return (r as any).data
+  return http.get<unknown, RecommendBook[]>('/recommend', { params: { reader_id: readerId, limit } })
 }
 
 /* ---------- 管理端 ---------- */
@@ -113,8 +115,7 @@ export async function getAdminSummary(): Promise<AdminSummary> {
     await delay(200)
     return mockSummary
   }
-  const r = await http.get('/admin/stats/summary')
-  return (r as any).data
+  return http.get<unknown, AdminSummary>('/admin/stats/summary')
 }
 
 export async function getHotBooks(limit = 10): Promise<BookStat[]> {
@@ -122,8 +123,7 @@ export async function getHotBooks(limit = 10): Promise<BookStat[]> {
     await delay(200)
     return mockHotBooks.slice(0, limit)
   }
-  const r = await http.get('/admin/stats/hot-books', { params: { limit } })
-  return (r as any).data
+  return http.get<unknown, BookStat[]>('/admin/stats/hot-books', { params: { limit } })
 }
 
 export async function getCategories(): Promise<CategoryStat[]> {
@@ -131,6 +131,32 @@ export async function getCategories(): Promise<CategoryStat[]> {
     await delay(200)
     return mockCategories
   }
-  const r = await http.get('/admin/stats/categories')
-  return (r as any).data
+  return http.get<unknown, CategoryStat[]>('/admin/stats/categories')
+}
+
+/** 出版社 TOP10（待后端契约：GET /api/admin/stats/publishers） */
+export async function getPublishers(limit = 10): Promise<BookStat[]> {
+  if (USE_MOCK) {
+    await delay(200)
+    return mockPublishers.slice(0, limit)
+  }
+  return http.get<unknown, BookStat[]>('/admin/stats/publishers', { params: { limit } })
+}
+
+/** 借阅趋势：近N天每日借阅量（待后端契约：GET /api/admin/stats/trend） */
+export async function getBorrowTrend(days = 30): Promise<BorrowTrendPoint[]> {
+  if (USE_MOCK) {
+    await delay(200)
+    return mockBorrowTrend.slice(-days)
+  }
+  return http.get<unknown, BorrowTrendPoint[]>('/admin/stats/trend', { params: { days } })
+}
+
+/** AI 智能采购建议（契约 5.3：POST /api/admin/purchase-advice） */
+export async function getPurchaseAdvice(): Promise<string> {
+  if (USE_MOCK) {
+    await delay(300)
+    return mockAdvice
+  }
+  return http.post<unknown, string>('/admin/purchase-advice')
 }
