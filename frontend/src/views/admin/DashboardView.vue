@@ -162,7 +162,26 @@ onBeforeUnmount(() => {
     </header>
 
     <div class="content">
-      <CuState v-if="loading" type="loading" message="正在加载运营数据…" />
+      <!-- 骨架屏加载 -->
+      <template v-if="loading">
+        <div class="stat-row">
+          <div v-for="i in 4" :key="i" class="lg lg-r22 skeleton-card">
+            <div class="sk sk-ico"></div>
+            <div class="sk sk-num"></div>
+            <div class="sk sk-label"></div>
+          </div>
+        </div>
+        <div class="chart-row">
+          <div class="lg-panel chart-card skeleton-block">
+            <div class="sk sk-title"></div>
+            <div class="sk sk-chart"></div>
+          </div>
+          <div class="lg-panel chart-card skeleton-block">
+            <div class="sk sk-title"></div>
+            <div class="sk sk-chart"></div>
+          </div>
+        </div>
+      </template>
       <CuState v-else-if="error" type="error" :message="error" @retry="loadData" />
       <template v-else>
         <div class="stat-row">
@@ -320,6 +339,28 @@ onBeforeUnmount(() => {
   line-height: 1.9;
   color: var(--ink);
   margin: 0;
+}
+
+/* 骨架屏 */
+.skeleton-card { padding: 18px 20px; }
+.skeleton-block { padding: 18px 22px; }
+.sk {
+  background: linear-gradient(90deg, rgba(180,195,205,0.25) 25%, rgba(180,195,205,0.45) 50%, rgba(180,195,205,0.25) 75%);
+  background-size: 200% 100%;
+  animation: sk-shimmer 1.4s ease-in-out infinite;
+  border-radius: 8px;
+}
+.sk-ico { width: 38px; height: 38px; border-radius: 12px; margin-bottom: 12px; }
+.sk-num { width: 60%; height: 28px; margin-bottom: 8px; }
+.sk-label { width: 40%; height: 14px; }
+.sk-title { width: 35%; height: 18px; margin-bottom: 16px; }
+.sk-chart { width: 100%; height: 240px; }
+@keyframes sk-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sk { animation: none; }
 }
 
 @media (max-width: 760px) {
