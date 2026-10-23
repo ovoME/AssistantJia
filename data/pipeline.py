@@ -138,7 +138,7 @@ def clean_frame(raw: pd.DataFrame, dataset_label: str = "unknown"):
     links = links[(reasons == "") & (links["book_id"] != "") & (links["isbn13"] != "")]
     copy_isbns = links.groupby("book_id")["isbn13"].agg(lambda values: sorted(set(values)))
     unique_links = {copy: values[0] for copy, values in copy_isbns.items() if len(values) == 1}
-    recovered = normalized["book_id"].map(unique_links).fillna("")
+    recovered = normalized["book_id"].map(unique_links).astype(object).fillna("")
     resolve_mask = (canonical == "") & (recovered != "")
     if resolve_mask.any():
         normalized.loc[resolve_mask, "book_key"] = "isbn:" + recovered[resolve_mask]
@@ -170,7 +170,7 @@ def clean_frame(raw: pd.DataFrame, dataset_label: str = "unknown"):
         "missing_rates": {c: round(v / len(raw), 6) if len(raw) else 0 for c, v in missing.items()},
         "normalized_duplicate_excess_rows": int(normalized.duplicated(subset=FIELDS).sum()),
         "duplicate_policy": "preserved_no_event_id_or_borrow_date",
-        "invalid_isbn_rows": int(normalized["isbn"].map(lambda s: bool(s) and not bool(canonical_isbn(s))).sum()),
+        "invalid_isbn_rows": sum(1 for value in normalized["isbn"] if value and not canonical_isbn(value)),
         "unknown_category_rows": int((normalized["category_code"] == "UNKNOWN").sum()),
         "book_metadata_conflict_groups": metadata_conflicts,
         "copy_isbn_conflict_groups": int(copy_isbns.map(len).gt(1).sum()),

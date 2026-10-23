@@ -99,8 +99,37 @@ class PipelineTests(unittest.TestCase):
             summary, tables = analyze_frame(clean)
             self.assertEqual((len(clean), len(books), len(readers)), (0, 0, 0))
             self.assertEqual(len(rejected), len(raw))
+            self.assertEqual(quality["invalid_isbn_rows"], 0)
             self.assertIsNone(summary["borrows_per_reader"])
             self.assertTrue(all(t.empty for t in tables.values()))
+
+    def test_invalid_isbn_counts_include_rejected_rows_and_ignore_blanks(self):
+        raw = fixture()
+        raw.loc[5, "IISSBN"] = "bad-isbn"
+        for dtype in (object, "string"):
+            with self.subTest(dtype=dtype):
+                _, _, _, _, quality = clean_frame(raw.astype(dtype))
+                self.assertEqual(quality["invalid_isbn_rows"], 2)
+
+    def test_empty_csv_exports_zero_counts_and_empty_api_lists(self):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parent) as tmp:
+            folder = Path(tmp)
+            source = folder / "empty.csv"
+            output = folder / "result"
+            pd.DataFrame(columns=HEADERS).to_csv(source, index=False, encoding="utf-8-sig")
+            quality = clean_file(source, output, "simulated")
+            summary = analyze_file(output / "borrow_records.csv", output)
+            self.assertEqual(quality["invalid_isbn_rows"], 0)
+            self.assertEqual(summary["borrow_count"], 0)
+            dashboard = json.loads((output / "dashboard.json").read_text(encoding="utf-8"))
+            self.assertEqual(dashboard["dataset_label"], "simulated")
+            self.assertEqual(dashboard["data"]["summary"], {
+                "total_borrows": 0, "total_readers": 0, "total_titles": 0,
+                "avg_borrow_per_reader": None,
+            })
+            for name in ("hot_books", "categories", "publishers"):
+                payload = json.loads((output / f"api_{name}.json").read_text(encoding="utf-8"))
+                self.assertEqual(payload["data"], [])
 
     def test_csv_roundtrip_and_dashboard_has_no_reader_ids(self):
         with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parent) as tmp:
