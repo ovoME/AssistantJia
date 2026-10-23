@@ -19,18 +19,18 @@ async def get_summary_stats():
 
 @router.get("/stats/hot-books", response_model=ApiResponse[List[BookStat]])
 async def get_hot_books_stats():
-    """热门图书 TOP10"""
+    """热门图书 TOP10（按借阅量倒序）"""
     hot_books = [
-        BookStat(title="三体全集", author="刘慈欣", call_number="I247.55/123", borrow_count=428),
-        BookStat(title="平凡的世界", author="路遥", call_number="I247.57/88", borrow_count=396),
-        BookStat(title="深入理解计算机系统", author="Randal E. Bryant", call_number="TP3/288", borrow_count=312),
-        BookStat(title="Python编程：从入门到实践", author="Eric Matthes", call_number="TP311.56/45", borrow_count=298),
-        BookStat(title="微观经济学", author="范里安", call_number="F016/52", borrow_count=276),
-        BookStat(title="百年孤独", author="加西亚·马尔克斯", call_number="I775.45/1", borrow_count=254),
-        BookStat(title="被讨厌的勇气", author="岸见一郎", call_number="B848.4/19", borrow_count=235),
-        BookStat(title="人类简史", author="尤瓦尔·赫拉利", call_number="K109/4", borrow_count=218),
-        BookStat(title="高等数学辅导讲义", author="汤家凤", call_number="O13/99", borrow_count=205),
-        BookStat(title="陈嘉庚传", author="陈嘉庚研究会", call_number="K825.38/1", borrow_count=192),
+        BookStat(title="三体全集", author="刘慈欣", count=428, call_number="I247.55/123", category="I"),
+        BookStat(title="平凡的世界", author="路遥", count=396, call_number="I247.57/88", category="I"),
+        BookStat(title="深入理解计算机系统", author="Randal E. Bryant", count=312, call_number="TP3/288", category="TP"),
+        BookStat(title="Python编程：从入门到实践", author="Eric Matthes", count=298, call_number="TP311.56/45", category="TP"),
+        BookStat(title="微观经济学", author="范里安", count=276, call_number="F016/52", category="F"),
+        BookStat(title="百年孤独", author="加西亚·马尔克斯", count=254, call_number="I775.45/1", category="I"),
+        BookStat(title="被讨厌的勇气", author="岸见一郎", count=235, call_number="B848.4/19", category="B"),
+        BookStat(title="人类简史", author="尤瓦尔·赫拉利", count=218, call_number="K109/4", category="K"),
+        BookStat(title="高等数学辅导讲义", author="汤家凤", count=205, call_number="O13/99", category="O"),
+        BookStat(title="陈嘉庚传", author="陈嘉庚研究会", count=192, call_number="K825.38/1", category="K"),
     ]
     return ApiResponse.ok(data=hot_books)
 
@@ -38,13 +38,13 @@ async def get_hot_books_stats():
 async def get_category_stats():
     """借阅中图分类大类占比"""
     categories = [
-        CategoryStat(code="I", name="文学", count=11200, ratio=0.303),
-        CategoryStat(code="TP", name="工业技术/计算机", count=8950, ratio=0.242),
-        CategoryStat(code="F", name="经济管理", count=6820, ratio=0.185),
-        CategoryStat(code="B", name="哲学/心理学", count=3410, ratio=0.092),
-        CategoryStat(code="H", name="语言文字", count=2850, ratio=0.077),
-        CategoryStat(code="K", name="历史地理/特藏", count=2100, ratio=0.057),
-        CategoryStat(code="O", name="数理科学", count=1578, ratio=0.044),
+        CategoryStat(category="I", category_name="文学", count=11200, share=0.303),
+        CategoryStat(category="TP", category_name="工业技术/计算机", count=8950, share=0.242),
+        CategoryStat(category="F", category_name="经济管理", count=6820, share=0.185),
+        CategoryStat(category="B", category_name="哲学/心理学", count=3410, share=0.092),
+        CategoryStat(category="H", category_name="语言文字", count=2850, share=0.077),
+        CategoryStat(category="K", category_name="历史地理/特藏", count=2100, share=0.057),
+        CategoryStat(category="O", category_name="数理科学", count=1578, share=0.044),
     ]
     return ApiResponse.ok(data=categories)
 
