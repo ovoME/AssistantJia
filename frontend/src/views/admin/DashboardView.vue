@@ -102,13 +102,17 @@ function renderCharts() {
     pieChart = echarts.init(pieChartRef.value)
     const totalCats = categories.value.reduce((s, c) => s + c.count, 0)
     pieChart.setOption({
-      tooltip: { trigger: 'item', confine: true },
+      tooltip: {
+        trigger: 'item',
+        confine: true,
+        formatter: (p: { name: string; value: number }) => `${p.name} · ${p.value}本`,
+      },
       legend: { bottom: 0, icon: 'circle', textStyle: { color: '#42545e', fontSize: 11 } },
       title: {
         text: totalCats.toLocaleString(),
         subtext: '总借阅',
         left: 'center',
-        top: '36%',
+        top: '34%',
         textAlign: 'center',
         textStyle: { fontSize: 20, fontWeight: 700, color: '#16262e' },
         subtextStyle: { fontSize: 11, color: '#6b7d87' },
@@ -123,7 +127,7 @@ function renderCharts() {
             value: c.count,
             itemStyle: { color: palette[i % palette.length], borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
           })),
-          label: { fontSize: 11, color: '#42545e' },
+          label: { fontSize: 11, color: '#42545e', overflow: 'none', width: 80 },
         },
       ],
     })
