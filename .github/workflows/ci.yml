@@ -61,7 +61,7 @@ jobs:
           if [ -f backend/Dockerfile ]; then docker build -t xiaojia-backend:ci ./backend; else echo "backend/Dockerfile 未合入，跳过"; fi
       - name: 扫描后端镜像（Trivy，报告模式）
         if: ${{ hashFiles('backend/Dockerfile') != '' }}
-        uses: aquasecurity/trivy-action@v0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: xiaojia-backend:ci
           format: table
@@ -73,7 +73,7 @@ jobs:
           if [ -f frontend/Dockerfile ]; then docker build -t xiaojia-frontend:ci ./frontend; else echo "frontend/Dockerfile 未合入，跳过"; fi
       - name: 扫描前端镜像（Trivy，报告模式）
         if: ${{ hashFiles('frontend/Dockerfile') != '' }}
-        uses: aquasecurity/trivy-action@v0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: xiaojia-frontend:ci
           format: table
