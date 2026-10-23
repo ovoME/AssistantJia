@@ -102,7 +102,7 @@ function renderCharts() {
     pieChart = echarts.init(pieChartRef.value)
     const totalCats = categories.value.reduce((s, c) => s + c.count, 0)
     pieChart.setOption({
-      tooltip: { trigger: 'item' },
+      tooltip: { trigger: 'item', confine: true },
       legend: { bottom: 0, icon: 'circle', textStyle: { color: '#42545e', fontSize: 11 } },
       title: {
         text: totalCats.toLocaleString(),
