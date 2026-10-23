@@ -82,7 +82,14 @@ def test_recommend(client):
 @pytest.mark.e2e
 def test_hot_books(client):
     body = assert_ok(client.get("/hot-books", params={"category": "I", "limit": 10}))
-    assert body.get("data") is not None, "应返回热门榜单"
+    data = body.get("data") or []
+    assert data, "应返回热门榜单"
+    # 按借阅量倒序且带 count 字段（修复后的契约字段）
+    counts = [b.get("count") for b in data]
+    assert all(isinstance(c, int) for c in counts), f"榜单应包含 count 字段: {data}"
+    assert counts == sorted(counts, reverse=True), "榜单应按借阅量倒序"
+    # category 过滤应真正生效（只返回文学类 I）
+    assert all(b.get("category") == "I" for b in data), f"category=I 过滤未生效: {data}"
 
 
 # ---- 场景6：管理端借阅概览 ----

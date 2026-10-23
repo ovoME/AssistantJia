@@ -20,7 +20,8 @@ services:
       redis:
         condition: service_healthy
       chroma:
-        condition: service_healthy
+        # backend 暂未依赖向量检索就绪，用 service_started 避免 Chroma 拖死主链路
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s
@@ -62,9 +63,9 @@ services:
     networks:
       - xiaojia-net
 
-  # 向量数据库
+  # 向量数据库（锁定 0.5.x：1.x 起 /api/v1/heartbeat 已废弃，避免健康检查失配）
   chroma:
-    image: chromadb/chroma:latest
+    image: chromadb/chroma:0.5.23
     container_name: xiaojia-chroma
     restart: unless-stopped
     ports:

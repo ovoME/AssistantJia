@@ -84,8 +84,12 @@ jobs:
   integration:
     name: 集成测试（docker compose + E2E）
     runs-on: ubuntu-latest
-    # 仅在全栈代码合入 develop/main 后运行，避免未合并分支导致误报
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
+    # 仅在全栈代码合入 develop/main 后运行，且 backend/Dockerfile 已存在时才执行，
+    # 避免后端未合入期间 compose 构建失败导致 develop 变红
+    if: |
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main') &&
+      hashFiles('backend/Dockerfile') != ''
     needs: [backend, frontend, docker-build]
     steps:
       - uses: actions/checkout@v4
