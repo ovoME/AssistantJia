@@ -1,0 +1,70 @@
+# 「小嘉」部署流水线：构建镜像 → 推送 GHCR → SSH 部署到服务器
+# 触发：手动（workflow_dispatch）或 push 到 main
+# 需要的仓库 Secrets：
+#   DEPLOY_HOST / DEPLOY_USER / DEPLOY_SSH_KEY / GHCR_PAT（推送镜像用）
+name: Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore: ["docs/**", "README.md"]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BACKEND: ghcr.io/${{ github.repository }}/xiaojia-backend
+  IMAGE_FRONTEND: ghcr.io/${{ github.repository }}/xiaojia-frontend
+
+jobs:
+  build-and-push:
+    name: 构建并推送镜像
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: 登录 GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_PAT }}
+      - name: 构建并推送后端镜像
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.IMAGE_BACKEND }}:latest
+            ${{ env.IMAGE_BACKEND }}:${{ github.sha }}
+      - name: 构建并推送前端镜像
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.IMAGE_FRONTEND }}:latest
+            ${{ env.IMAGE_FRONTEND }}:${{ github.sha }}
+
+  deploy:
+    name: SSH 部署到生产服务器
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: 部署
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/xiaojia
+            git pull --ff-only || true
+            docker compose pull
+            docker compose up -d
+            docker image prune -f
+            echo "部署完成"

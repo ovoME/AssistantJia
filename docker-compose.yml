@@ -1,4 +1,5 @@
 services:
+  # 后端服务 (FastAPI + LangChain Agent)
   backend:
     build:
       context: ./backend
@@ -16,11 +17,20 @@ services:
     volumes:
       - ./data:/app/data
     depends_on:
-      - redis
-      - chroma
+      redis:
+        condition: service_healthy
+      chroma:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - xiaojia-net
 
+  # 前端服务 (Vue 3 + Vite 构建产物由 Nginx 托管)
   frontend:
     build:
       context: ./frontend
@@ -30,10 +40,12 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - xiaojia-net
 
+  # 缓存与会话存储
   redis:
     image: redis:7-alpine
     container_name: xiaojia-redis
@@ -42,9 +54,15 @@ services:
       - "6379:6379"
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     networks:
       - xiaojia-net
 
+  # 向量数据库
   chroma:
     image: chromadb/chroma:latest
     container_name: xiaojia-chroma
@@ -53,6 +71,12 @@ services:
       - "8001:8000"
     volumes:
       - chroma-data:/chroma/chroma
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/api/v1/heartbeat', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - xiaojia-net
 
