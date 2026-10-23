@@ -337,6 +337,7 @@ async function onRenew(book: BorrowRecord) {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  box-shadow: inset 0 1.5px 1px rgba(255,255,255,1), 0 4px 12px rgba(20,50,60,0.08);
 }
 .rec-book { font-size: 14px; font-weight: 700; color: var(--ink); line-height: 1.4; }
 .rec-author { font-size: 12px; color: var(--ink-3); }
