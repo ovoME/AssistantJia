@@ -1,6 +1,6 @@
 # C1 数据交付约定
 
-此文件描述 C1 已导出的文件，以及对仓库 `docs/api-contract.md` 和 `frontend/src/types/index.ts` 的字段映射。HTTP 服务尚未实现，A 需将响应文件接入实际路由；管理端鉴权随服务入口实现。
+此文件描述 C1 已导出的文件，以及对仓库 `docs/api-contract.md` 和 `frontend/src/types/index.ts` 的字段映射。现有 HTTP 统计路由仍使用 mock，A 需将响应文件接入实际路由；管理端鉴权随接入落实。C2 推荐另见 [C2 推荐交付约定](c2-recommendation.md)。
 
 ## 统计字段
 
@@ -48,4 +48,4 @@
 
 ## 后续输入
 
-C2 推荐使用 borrow_records.csv 和 books.csv；仍需从完整已借书集合过滤历史，ISBN 缺失时的同书识别需进一步优化。C3 的 location、available、status 均须来自实时 OPAC 或已核实馆藏映射；C1 没有生成这些字段。C4 不使用团队计划当作馆方规则，需另收集正式规章、数据库导航及 FAQ。
+C2 已使用完整 borrow_records.csv 和 books.csv 实现热门、分类偏好和协同过滤推荐，并从完整已读集合过滤历史。ISBN 缺失时使用无歧义的完整精确元数据归并候选，不改写 C1 输出；C2 count 因跨副本归并可能与单个 C1 book_key 的次数不同。C3 的 location、available、status 均须来自实时 OPAC 或已核实馆藏映射；C1/C2 没有生成这些字段。C4 不使用团队计划当作馆方规则，需另收集正式规章、数据库导航及 FAQ。
