@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from data.isbn import canonical_isbn
+
 FIELDS = ["reader_id", "call_number", "book_id", "title", "author", "isbn", "publisher"]
 ALIASES = {
     "reader_id": ["reader_id", "证件号", "读者证号", "读者编号", "读者ID"],
@@ -47,21 +49,6 @@ def header_key(value) -> str:
 def normalize_isbn(value) -> str:
     value = re.sub(r"^ISBN(?:-1[03])?\s*[:：]?\s*", "", text(value), flags=re.I)
     return re.sub(r"[\s\-‐‑–—]", "", value).upper()
-
-
-def canonical_isbn(value: str) -> str:
-    """合法 ISBN 返回 ISBN13；错误号码返回空串，不把错号当图书主键。"""
-    if re.fullmatch(r"\d{9}[\dX]", value):
-        digits = [int(c) if c != "X" else 10 for c in value]
-        if sum((10 - i) * d for i, d in enumerate(digits)) % 11:
-            return ""
-        base = "978" + value[:9]
-        check = (-sum(int(c) * (1 if i % 2 == 0 else 3) for i, c in enumerate(base))) % 10
-        return base + str(check)
-    if re.fullmatch(r"97[89]\d{10}", value):
-        total = sum(int(c) * (1 if i % 2 == 0 else 3) for i, c in enumerate(value))
-        return value if total % 10 == 0 else ""
-    return ""
 
 
 def category_for(call_number: str) -> str:

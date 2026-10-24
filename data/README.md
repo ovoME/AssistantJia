@@ -75,10 +75,29 @@ python -m data.scripts.analyze
 python -m data.scripts.generate_demo --rows 36908 --output data/demo/borrow_records_demo.csv
 ```
 
+## C3 本地书目检索
+
+C3 支持馆藏书目 CSV 导出与 C1 books.csv 两种输入，使用 SQLite 和 Python 标准库，无需联网或额外检索服务。
+
+```powershell
+# 馆藏导出：ID/TITLE/AUTHOR/PUBLISHER/YEAR/CALLNO/LANGUAGE/DOCTYPE
+python -m data.scripts.build_catalog --input "数据目录/图书数据.csv" --dataset-label real
+# 或者从 C1 的历史借阅样本书目建库
+python -m data.scripts.build_catalog --data-dir data/processed
+# 上面两种命令默认覆盖同一个 catalog.sqlite3；用 --database 可分别保存
+python -m data.scripts.search_catalog --query "计算机" --limit 5
+python -m data.scripts.search_catalog --query "TP311" --limit 10
+python -S -W error -m unittest discover -s data/tests -p test_catalog.py -v
+```
+
+支持书名、作者、出版社、索书号与合法 ISBN10/13 检索，空白分隔的多个词均需匹配；无结果返回空列表。缺 ISBN 的馆藏导出保留空值，不从 ID 生成 ISBN。馆藏导出 ID 使用 `catalog:` 命名空间，与借阅流水财产号分开。
+
+本地目录不会生成实时馆藏信息。未提供馆藏快照时，`location/available` 为 null，`status` 为 unknown；可选快照需来源和时间，数量只放在 `holdings_snapshot`，不会提升为当前可借状态。原始文件不修改，数据库、来源摘要和缺失记录计数留在本地被忽略的输出目录。字段、快照格式及后端接入说明见 [C3 检索交付约定](../docs/c3-catalog.md)。
+
 ## 团队对接
 
 模块位于 `data/`，测试位于 `data/tests/`，轻量依赖位于 `data/requirements.txt`，与现有后端依赖下限保持一致。前端和现有后端服务入口由各自负责人接入。`docs/c-data-contract.md` 说明原生统计字段与现有接口字段的映射；`total_titles` 使用规范化题名数，和 `book_key` 数分开。
 
 仓库 `.gitignore` 排除真实原始数据、生成数据和模拟 CSV，保留目录占位。真实借阅记录、证件号、逐人画像留在本地数据目录。
 
-下一阶段是 C2 分类热门推荐；C3 OPAC 需要真实地址及接口说明；C4 知识库需要馆方原始规则；C5 统计 HTTP 接口需与 A、D 的现有结构及鉴权方式对齐。本包交付的是 C1，不把其他模块标记为已完成。
+C3 已交付本地书目检索；实时 OPAC 仍需可核实的接口说明，借阅财产号与馆藏导出 ID 的关联仍需对照资料。C2 推荐由独立 PR 交付；C4 知识库需要馆方原始规则；C5 统计 HTTP 数据接入需与 A、D 的现有结构及鉴权方式对齐。
