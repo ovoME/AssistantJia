@@ -42,3 +42,4 @@ jobs:
           python -W error -m data.scripts.analyze
           python -S -W error -m data.scripts.recommend --reader-id 000002 --limit 5 --output data/processed/recommendations.json
           python -S -W error -m data.scripts.validate_recommendations --limit 5 --holdout-readers 20 --output data/processed/recommendation_validation.json
+          python -S -W error -m data.scripts.compare_recommendations --phase validation --validation-size 20 --test-size 20 --legacy-size 0 --output data/processed/content_validation.json

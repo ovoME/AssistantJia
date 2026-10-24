@@ -103,6 +103,32 @@ def evaluate_holdout(engine, catalog, loans, limit=10, max_readers=200):
                       key=lambda reader: _digest("c2-eval-20261024/" + reader))[:max_readers]
     heldout = {reader: min(engine._histories[reader], key=lambda key: _digest(reader + "/" + key))
                for reader in selected}
+    training, removed = build_holdout(engine, catalog, loans, heldout)
+    metrics = {}
+    for strategy in STRATEGIES:
+        hits, reciprocal_rank, ndcg = 0, 0.0, 0.0
+        for reader, target in heldout.items():
+            keys = [row["book_key"] for row in training.recommend(reader, limit=limit, strategy=strategy)]
+            if target in keys:
+                rank = keys.index(target) + 1
+                hits += 1
+                reciprocal_rank += 1 / rank
+                ndcg += 1 / math.log2(rank + 1)
+        n = len(heldout)
+        metrics[strategy] = {"hits": hits, "hit_rate": round(hits / n, 6) if n else None,
+                             "mrr": round(reciprocal_rank / n, 6) if n else None,
+                             "ndcg": round(ndcg / n, 6) if n else None}
+    return {
+        "method": "deterministic_leave_one_distinct_book_out", "limit": limit,
+        "evaluated_readers": len(heldout), "removed_loan_rows": removed,
+        "heldout_books_with_training_borrows": sum(bool(training._counts[key]) for key in heldout.values()),
+        "training_rows": len(loans) - removed, "metrics": metrics,
+        "limitations": "没有借阅日期；这是固定哈希抽样的离线回放，不代表未来借阅、用户满意度或线上效果。",
+    }
+
+
+def build_holdout(engine, catalog, loans, heldout):
+    """训练前移除所有目标及其别名的复借；保留静态书目，包括零训练次数书。"""
     canonical_by_metadata = defaultdict(list)
     for key, book in engine._books.items():
         canonical_by_metadata[_metadata(book)].append(key)
@@ -127,29 +153,9 @@ def evaluate_holdout(engine, catalog, loans, limit=10, max_readers=200):
         counts[key] += 1
     training_books = [{**book, "borrow_count": str(counts[key])} for key, book in engine._books.items()]
     training = Recommender(training_books, training_loans, engine.dataset_label)
-    metrics = {}
-    for strategy in STRATEGIES:
-        hits, reciprocal_rank, ndcg = 0, 0.0, 0.0
-        for reader, target in heldout.items():
-            if target in training._histories.get(reader, set()):
-                raise ValueError("留出书种仍在训练历史中，存在数据泄漏。")
-            keys = [row["book_key"] for row in training.recommend(reader, limit=limit, strategy=strategy)]
-            if target in keys:
-                rank = keys.index(target) + 1
-                hits += 1
-                reciprocal_rank += 1 / rank
-                ndcg += 1 / math.log2(rank + 1)
-        n = len(heldout)
-        metrics[strategy] = {"hits": hits, "hit_rate": round(hits / n, 6) if n else None,
-                             "mrr": round(reciprocal_rank / n, 6) if n else None,
-                             "ndcg": round(ndcg / n, 6) if n else None}
-    return {
-        "method": "deterministic_leave_one_distinct_book_out", "limit": limit,
-        "evaluated_readers": len(heldout), "removed_loan_rows": removed,
-        "heldout_books_with_training_borrows": sum(bool(counts[key]) for key in heldout.values()),
-        "training_rows": len(training_loans), "metrics": metrics,
-        "limitations": "没有借阅日期；这是固定哈希抽样的离线回放，不代表未来借阅、用户满意度或线上效果。",
-    }
+    if any(target in training._histories.get(reader, set()) for reader, target in heldout.items()):
+        raise ValueError("留出书种仍在训练历史中，存在数据泄漏。")
+    return training, removed
 
 
 def main():

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import heapq
 import json
 import math
 import re
@@ -10,6 +11,8 @@ import unicodedata
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Iterable, Mapping
+
+from data.content import ContentIndex
 
 
 STRATEGIES = ("hybrid", "popular", "category", "collaborative")
@@ -62,6 +65,9 @@ class Recommender:
     协同过滤使用二元读者-书种集合与余弦相似度，最多取 30 位邻居。
     热门度保留 C1 流水计数；偏好与相似度不受同一读者重复借同书影响。
     """
+
+    # 600 人独立验证集在预设五个权重中选出；测试集不参与调参。
+    CONTENT_WEIGHT = 0.75
 
     def __init__(
         self,
@@ -122,6 +128,7 @@ class Recommender:
         for entity in sorted(set(entities.values())):
             # ISBN 代表项优先；否则使用最稳定的原始 book_key。
             self._books[entity] = catalog[entity].copy()
+        self._content = ContentIndex(self._books)
 
     @classmethod
     def from_directory(cls, directory: str | Path) -> Recommender:
@@ -206,6 +213,8 @@ class Recommender:
         max_count = max(self._counts[key] for key in candidates) or 1
         has_collaborative = any(collaborative.get(key, 0) for key in candidates)
         has_preferences = any(preferences[self._books[key]["category_code"]] for key in candidates)
+        content = self._content.scores(history) if history and strategy == "hybrid" and self.CONTENT_WEIGHT else {}
+        max_content = max((content.get(key, 0) for key in candidates), default=0)
         ranked = []
         for key in candidates:
             book = self._books[key]
@@ -227,7 +236,17 @@ class Recommender:
             else:
                 reason, method = "根据历史借阅次数推荐", "popular"
             ranked.append((score, key, reason, method))
-        ranked.sort(key=lambda row: (-row[0], -self._counts[row[1]], row[1]))
+        if max_content:
+            max_base = max(row[0] for row in ranked) or 1
+            combined = []
+            for score, key, reason, method in ranked:
+                content_part = self.CONTENT_WEIGHT * content.get(key, 0) / max_content
+                base_part = (1 - self.CONTENT_WEIGHT) * score / max_base
+                if content_part > base_part:
+                    reason, method = "根据你借过图书的题名、作者或细分分类相似度推荐", "content"
+                combined.append((content_part + base_part, key, reason, method))
+            ranked = combined
+        ranked = heapq.nsmallest(limit, ranked, key=lambda row: (-row[0], -self._counts[row[1]], row[1]))
         return [{**self._item(key), "score": round(score, 8), "reason": reason, "strategy": method}
                 for score, key, reason, method in ranked[:limit]]
 
