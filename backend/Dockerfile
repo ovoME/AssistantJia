@@ -13,8 +13,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制依赖清单并安装
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# RAG/ML 重依赖（torch + CUDA，数 GB）默认不装，需要时：
+#   docker build --build-arg INSTALL_ML=true -t xiaojia-backend ./backend
+COPY requirements*.txt ./
+ARG INSTALL_ML=false
+RUN pip install --no-cache-dir -r requirements.txt \
+    && if [ "$INSTALL_ML" = "true" ]; then pip install --no-cache-dir -r requirements-ml.txt; fi
 
 # 复制后端源码
 COPY app ./app
