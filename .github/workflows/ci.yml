@@ -28,16 +28,15 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
       - name: 安装依赖
-        # --no-cache-dir：绕过 setup-python 缓存损坏导致安装失败的场景；三重试吸收网络抖动
+        # 三重试吸收网络抖动；重依赖已由 #11 拆到 requirements-ml.txt，避免 CI 磁盘超限
         run: |
           for i in 1 2 3; do
-            if pip install --no-cache-dir -r requirements.txt; then exit 0; fi
+            if pip install -r requirements.txt; then exit 0; fi
             echo "pip 安装失败，第 $i 次重试…"
             sleep 15
           done
           exit 1
       - name: 单元测试
-        # A 的 backend/tests 合入前自动跳过，避免 PR 阶段误报
         run: |
           if [ -d tests ]; then python -m pytest tests -q; else echo "backend/tests 未合入，跳过"; fi
 
