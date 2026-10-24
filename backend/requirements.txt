@@ -4,8 +4,8 @@
 #   sentence-transformers 会连带安装 torch 及整套 CUDA 运行库
 #   （nvidia_cufft 214MB / nvidia_cusolver 201MB / triton 248MB …，累计数 GB），
 #   GitHub Actions 免费 runner 磁盘不足，会直接 Disk quota exceeded 让 CI 变红。
-#   当前 app/rag/retriever.py 是占位实现（return []），这些包一次都没被 import，
-#   因此拆到 requirements-ml.txt，按需安装。
+#   C4 默认使用本地稀疏 TF-IDF 向量，不需要下载模型。
+#   后续如采用语义嵌入/Chroma，重依赖仍通过 requirements-ml.txt 按需安装。
 
 # ---- FastAPI 核心与 ASGI 服务器 ----
 fastapi>=0.110,<1

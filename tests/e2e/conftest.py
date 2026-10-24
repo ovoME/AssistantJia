@@ -14,6 +14,7 @@ BASE_URL = os.environ.get("BASE_URL", "http://localhost/api")
 # 健康检查为后端根路径（不在 /api 前缀下）
 HEALTH_URL = os.environ.get("HEALTH_URL", "http://localhost:8000/health")
 TIMEOUT = float(os.environ.get("E2E_TIMEOUT", "30"))
+ADMIN_TOKEN = os.environ.get("E2E_ADMIN_TOKEN", "")
 
 
 def _wait_ready(url: str, retries: int = 30, interval: float = 5.0) -> None:

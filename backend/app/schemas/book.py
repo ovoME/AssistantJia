@@ -6,9 +6,16 @@ class Book(BaseModel):
     author: str = Field(..., description="责任者/作者")
     isbn: str = Field(..., description="ISBN编号")
     call_number: str = Field(..., description="索书号")
-    location: str = Field(..., description="馆藏地与立体架位描述")
-    available: int = Field(default=1, description="可借数量")
-    status: str = Field(default="在馆", description="状态：在馆 / 借出")
+    location: Optional[str] = None
+    available: Optional[int] = None
+    status: str = "unknown"
+    book_key: Optional[str] = None
+    publisher: str = ""
+    is_live: bool = False
+    dataset_label: Optional[str] = None
+    holdings_snapshot: Optional[dict] = None
+    reason: Optional[str] = None
+    reservation_supported: bool = False
 
 class BorrowRecord(BaseModel):
     book_id: str = Field(..., description="图书条码号/财产号")
@@ -17,6 +24,9 @@ class BorrowRecord(BaseModel):
     due_date: str = Field(..., description="应还日期 YYYY-MM-DD")
     renew_count: int = Field(default=0, description="已续借次数")
     is_overdue: bool = Field(default=False, description="是否已超期")
+    can_renew: bool = False
+    dataset_label: str = "unknown"
+    is_live: bool = False
 
 class RenewRequest(BaseModel):
     reader_id: str = Field(..., description="读者证件号")
@@ -25,6 +35,7 @@ class RenewRequest(BaseModel):
 class RenewResult(BaseModel):
     new_due_date: str
     renew_count: int
+    can_renew: bool = False
 
 class ReserveRequest(BaseModel):
     reader_id: str = Field(..., description="读者证件号")
@@ -40,3 +51,9 @@ class RecommendBook(BaseModel):
     isbn: str
     call_number: str
     reason: str
+    book_key: str
+    publisher: str = ""
+    category: str = "UNKNOWN"
+    count: int = 0
+    score: float = 0
+    strategy: str = "popular"

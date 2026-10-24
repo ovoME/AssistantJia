@@ -2,8 +2,8 @@ services:
   # 后端服务 (FastAPI + LangChain Agent)
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: xiaojia-backend
     restart: unless-stopped
     ports:
@@ -12,10 +12,14 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - CHROMA_HOST=chroma
       - CHROMA_PORT=8000
+      - DATA_DIRECTORY=${DATA_DIRECTORY:-/app/data/processed/service-demo}
+      - CATALOG_DATABASE=${CATALOG_DATABASE:-/app/data/processed/service-demo/catalog.sqlite3}
+      - KNOWLEDGE_SOURCE=${KNOWLEDGE_SOURCE:-/app/data/knowledge/rules.json}
+      - USAGE_REPORT=${USAGE_REPORT:-/app/data/processed/usage.json}
     env_file:
       - .env
     volumes:
-      - ./data:/app/data
+      - ./data/processed:/app/data/processed:ro
     depends_on:
       redis:
         condition: service_healthy

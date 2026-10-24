@@ -3,13 +3,20 @@ import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import echarts from '@/utils/echarts'
 import type { ECharts } from '@/utils/echarts'
-import { getAdminSummary, getHotBooks, getCategories, getPublishers, getBorrowTrend, getPurchaseAdvice } from '@/api'
-import type { AdminSummary, BookStat, CategoryStat, BorrowTrendPoint } from '@/types'
+import { getAdminSummary, getHotBooks, getCategories, getPublishers, getBorrowTrend, getPurchaseAdvice, getUsage } from '@/api'
+import type { UsageReport } from '@/api'
+import type { AdminSummary, BookStat, CategoryStat, BorrowTrendPoint, PublisherStat } from '@/types'
 import { useToast } from '@/composables/useToast'
 import CuState from '@/components/cu/CuState.vue'
 
 const router = useRouter()
 const toast = useToast()
+const adminToken = ref(sessionStorage.getItem('xiaojia.adminToken') || '')
+function applyAdminToken() {
+  if (adminToken.value) sessionStorage.setItem('xiaojia.adminToken', adminToken.value)
+  else sessionStorage.removeItem('xiaojia.adminToken')
+  loadData()
+}
 
 const loading = ref(true)
 const summary = ref<AdminSummary>({
@@ -20,8 +27,9 @@ const summary = ref<AdminSummary>({
 })
 const hotBooks = ref<BookStat[]>([])
 const categories = ref<CategoryStat[]>([])
-const publishers = ref<BookStat[]>([])
+const publishers = ref<PublisherStat[]>([])
 const trend = ref<BorrowTrendPoint[]>([])
+const usage = ref<UsageReport>({ dataset_label: 'unknown', datasets: {}, limitations: [] })
 
 const hotChartRef = ref<HTMLElement | null>(null)
 const pieChartRef = ref<HTMLElement | null>(null)
@@ -42,12 +50,13 @@ async function loadData() {
   loading.value = true
   error.value = ''
   try {
-    const [s, h, c, p, t] = await Promise.all([getAdminSummary(), getHotBooks(10), getCategories(), getPublishers(10), getBorrowTrend(30)])
+    const [s, h, c, p, t, u] = await Promise.all([getAdminSummary(), getHotBooks(10), getCategories(), getPublishers(10), getBorrowTrend(30), getUsage()])
     summary.value = s
     hotBooks.value = h
     categories.value = c
     publishers.value = p
     trend.value = t
+    usage.value = u
     // 先关闭 loading，让内容区（含图表容器）真正渲染进 DOM，再 nextTick 初始化图表
     loading.value = false
     await nextTick()
@@ -130,7 +139,7 @@ function renderCharts() {
   // 出版社 TOP10 横条图
   if (publisherChartRef.value) {
     publisherChart = echarts.init(publisherChartRef.value)
-    const names = publishers.value.map((p) => p.title)
+    const names = publishers.value.map((p) => p.publisher || '出版社未提供')
     const counts = publishers.value.map((p) => p.count)
     publisherChart.setOption({
       grid: { left: 10, right: 36, top: 16, bottom: 10, containLabel: true },
@@ -274,6 +283,8 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <div class="topbar-actions">
+        <input v-model="adminToken" type="password" aria-label="管理端访问密钥" placeholder="管理端访问密钥" autocomplete="off" style="max-width:160px" @keyup.enter="applyAdminToken" />
+        <button class="cu-btn cu-btn-plain" @click="applyAdminToken">验证</button>
         <button class="cu-btn cu-btn-plain" @click="loadData" :disabled="loading">
           {{ loading ? '刷新中…' : '刷新数据' }}
         </button>
@@ -312,13 +323,14 @@ onBeforeUnmount(() => {
       </template>
       <CuState v-else-if="error" type="error" :message="error" @retry="loadData" />
       <template v-else>
+        <p>数据来源：{{ summary.dataset_label === 'real' ? '真实历史借阅样本' : (summary.dataset_label === 'simulated' ? '虚构模拟样本' : '未标明来源') }}。统计范围为当前批次，非全馆实时数据。</p>
         <div class="stat-row">
           <div
             v-for="(s, i) in [
               { label: '总借阅量', value: summary.total_borrows.toLocaleString(), color: '#0f9d8f', icon: '📚' },
-              { label: '活跃读者', value: summary.total_readers.toLocaleString(), color: '#007aff', icon: '👥' },
-              { label: '图书种数', value: summary.total_titles.toLocaleString(), color: '#f59e0b', icon: '📖' },
-              { label: '人均借阅（册）', value: summary.avg_borrow_per_reader, color: '#a78bfa', icon: '🔄' },
+              { label: '样本不同读者', value: summary.total_readers.toLocaleString(), color: '#007aff', icon: '👥' },
+              { label: '样本不同题名', value: summary.total_titles.toLocaleString(), color: '#f59e0b', icon: '📖' },
+              { label: '人均借阅（册）', value: summary.avg_borrow_per_reader ?? '—', color: '#a78bfa', icon: '🔄' },
             ]"
             :key="s.label"
             class="lg lg-r22 stat-card cu-pop"
@@ -332,10 +344,10 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="lg-panel chart-card cu-pop" style="animation-delay:0.08s">
-          <h3>近30天借阅趋势</h3>
+          <h3>借阅趋势</h3>
           <div class="chart-wrap">
             <div ref="trendChartRef" class="chart"></div>
-            <div v-if="!trend.length" class="chart-empty">暂无趋势数据</div>
+            <div v-if="!trend.length" class="chart-empty">当前借阅数据没有日期，无法绘制趋势</div>
           </div>
         </div>
 
@@ -367,23 +379,37 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
+        <div class="lg-panel chart-card">
+          <h3>资源使用导出统计（{{ usage.dataset_label === 'real' ? '真实数据' : usage.dataset_label === 'simulated' ? '模拟数据' : '未标明来源' }}）</h3>
+          <p v-if="!Object.keys(usage.datasets).length">尚未导入资源使用统计。</p>
+          <table v-else style="width:100%;text-align:left">
+            <thead><tr><th>来源</th><th>记录数</th><th>表内不同读者</th><th>观察日期范围</th></tr></thead>
+            <tbody><tr v-for="(item, key) in usage.datasets" :key="key">
+              <td>{{ item.source_file }}</td><td>{{ item.rows.toLocaleString() }}</td>
+              <td>{{ item.distinct_source_readers?.toLocaleString() ?? '不适用' }}</td>
+              <td>{{ item.observed_date_min || '未提供' }} — {{ item.observed_date_max || '未提供' }}</td>
+            </tr></tbody>
+          </table>
+          <p v-for="note in usage.limitations" :key="note">{{ note }}</p>
+        </div>
+
         <div class="lg-panel advice-card cu-pop" style="animation-delay:0.28s">
           <div class="advice-head">
-            <h3>🤖 AI 智能采购建议</h3>
+            <h3>历史借阅需求参考</h3>
             <button
               class="cu-btn cu-btn-teal cu-btn-sm"
               :disabled="adviceLoading"
               @click="genAdvice"
             >
-              {{ advice ? '重新生成' : '生成采购建议' }}
+              {{ advice ? '重新汇总' : '汇总需求参考' }}
             </button>
           </div>
           <div v-if="!advice && !adviceLoading" class="advice-empty">
-            点击右上角按钮，小嘉将基于借阅数据自动生成复购、剔旧与学科缺口建议。
+            查看样本中的高频需求；复购、剔旧及学科缺口仍需复本量和时间等资料。
           </div>
           <div v-if="adviceLoading && !advice" class="loading-line">
             <span class="cu-spinner"><span></span><span></span><span></span></span>
-            小嘉正在分析近期借阅数据…
+            正在汇总当前批次历史借阅数据…
           </div>
           <pre v-if="advice" class="advice-text">{{ advice }}</pre>
         </div>

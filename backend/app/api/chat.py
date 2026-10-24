@@ -1,34 +1,35 @@
-from fastapi import APIRouter
+import uuid
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
+from app.auth import reader_identity, resolve_reader
+from app.config import settings
 from app.schemas.chat import ChatRequest
 from app.schemas.common import ApiResponse
 from app.agent.agent import agent, get_session_history
 
 router = APIRouter(tags=["Chat"])
 
+
+def owner(request, identity):
+    cookie = request.cookies.get("xiaojia_session", "")
+    if not cookie or len(cookie) != 32 or any(c not in "0123456789abcdef" for c in cookie):
+        cookie = uuid.uuid4().hex
+    return ("reader:" + identity if identity else "visitor:" + cookie), cookie
+
+
 @router.post("/chat")
-async def chat_endpoint(req: ChatRequest):
-    """
-    智能体对话接口 (SSE 流式输出)
-    返回 text/event-stream 格式数据流
-    """
-    generator = agent.stream_chat(
-        message=req.message,
-        session_id=req.session_id,
-        reader_id=req.reader_id or "2023001"
-    )
-    return StreamingResponse(
-        generator,
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"
-        }
-    )
+async def chat_endpoint(req: ChatRequest, request: Request, identity=Depends(reader_identity)):
+    reader = resolve_reader(req.reader_id, identity)
+    principal, cookie = owner(request, identity)
+    generator = agent.stream_chat(req.message, principal + "/" + req.session_id, reader)
+    response = StreamingResponse(generator, media_type="text/event-stream",
+                                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    response.set_cookie("xiaojia_session", cookie, httponly=True, secure=settings.COOKIE_SECURE,
+                        samesite="lax", max_age=86400)
+    return response
+
 
 @router.get("/chat/history/{session_id}", response_model=ApiResponse)
-async def get_history_endpoint(session_id: str):
-    """获取指定会话的历史记录"""
-    history = get_session_history(session_id)
-    return ApiResponse.ok(data=history)
+def get_history_endpoint(session_id: str, request: Request, identity=Depends(reader_identity)):
+    principal, _ = owner(request, identity)
+    return ApiResponse.ok(data=get_session_history(principal + "/" + session_id))

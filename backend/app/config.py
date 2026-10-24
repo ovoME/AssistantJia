@@ -1,7 +1,11 @@
 import os
+from pathlib import Path
+from typing import Literal
 from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 class Settings(BaseSettings):
     """小嘉后端配置项，从环境变量或 .env 读取"""
@@ -25,6 +29,15 @@ class Settings(BaseSettings):
 
     # 图书馆业务系统 (OPAC) 接口
     OPAC_BASE_URL: str = Field(default="http://opac.example.edu.cn", alias="OPAC_BASE_URL")
+
+    DATA_DIRECTORY: str = str(PROJECT_ROOT / "data" / "processed")
+    CATALOG_DATABASE: str = str(PROJECT_ROOT / "data" / "processed" / "catalog.sqlite3")
+    KNOWLEDGE_SOURCE: str = str(PROJECT_ROOT / "data" / "knowledge" / "rules.json")
+    USAGE_REPORT: str = str(PROJECT_ROOT / "data" / "processed" / "usage.json")
+    OPAC_PROVIDER: Literal["disabled", "demo"] = "disabled"
+    ADMIN_TOKEN: Optional[str] = None
+    READER_TOKEN_SECRET: Optional[str] = None
+    COOKIE_SECURE: bool = False
 
     model_config = SettingsConfigDict(
         env_file=".env",

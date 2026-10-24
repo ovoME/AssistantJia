@@ -1,6 +1,6 @@
 # C1 数据交付约定
 
-此文件描述 C1 已导出的文件，以及对仓库 `docs/api-contract.md` 和 `frontend/src/types/index.ts` 的字段映射。现有 HTTP 统计路由仍使用 mock，A 需将响应文件接入实际路由；管理端鉴权随接入落实。C2 推荐另见 [C2 推荐交付约定](c2-recommendation.md)。
+此文件描述 C1 已导出的文件，以及对仓库 `docs/api-contract.md` 和 `frontend/src/types/index.ts` 的字段映射。HTTP 统计路由已接入同批借阅数据计算，原 api_*.json 保留供离线使用；管理端采用访问密钥，详细接入见 [C4/C5 服务说明](c4-c5-services.md)。C2 推荐另见 [C2 推荐交付约定](c2-recommendation.md)。
 
 ## 统计字段
 
@@ -42,7 +42,7 @@
 | categories[].count | categories.json 的 borrow_count |
 | publishers[].count | publishers.json 的 borrow_count |
 
-`category_name`、`share` 及图书 ISBN 等可选信息会随对应结果保留。没有读者时平均值为 null；当前前端类型将平均值声明为 number，接入空数据场景时需显示为空值状态。C1 未更改前端现有 mock 开关，也没有补造日期、架位或实时状态。
+`category_name`、`share` 及图书 ISBN 等可选信息会随对应结果保留。没有读者时平均值为 null；前后端已允许平均值为 null，页面显示为空值状态；前端默认访问后端，没有补造日期、架位或实时状态。
 
 统计明细 CSV 和逐人偏好 JSON 应由后端按权限读取，不作为公开静态资源。实际读者 ID 由认证层确定，接入时不能让任意访客传一个 ID 就读取其他人的画像。
 
