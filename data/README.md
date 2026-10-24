@@ -89,6 +89,8 @@ python -m data.scripts.recommend --reader-id 000002 --strategy category --catego
 python -m data.scripts.recommend --reader-id 000002 --strategy collaborative --data-dir data/processed
 # 可选写入本地文件；默认只向终端输出 JSON
 python -m data.scripts.recommend --reader-id 000002 --output data/processed/private/recommendations.json
+# 对全部读者运行四种策略，并做固定抽样留出评估；仅保存汇总，不导出逐人结果
+python -m data.scripts.validate_recommendations --limit 20 --holdout-readers 200 --output data/processed/recommendation_validation.json
 ```
 
 `hybrid`、`popular`、`category`、`collaborative` 四种策略均过滤该读者的全部已借书籍；无历史或无相似读者时使用可用的分类偏好或热门度，不补回已读书。缺 ISBN 的不同副本在完整题名、作者、出版社精确一致，且不涉及多个 ISBN 时可合并为同一推荐候选。仅从历史借阅中出现过的书目推荐，不能表示全馆书目或实时可借书。

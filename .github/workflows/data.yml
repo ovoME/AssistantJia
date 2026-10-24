@@ -41,3 +41,4 @@ jobs:
           python -W error -m data.scripts.clean_data --input data/demo/borrow_records_demo.csv --dataset-label simulated
           python -W error -m data.scripts.analyze
           python -S -W error -m data.scripts.recommend --reader-id 000002 --limit 5 --output data/processed/recommendations.json
+          python -S -W error -m data.scripts.validate_recommendations --limit 5 --holdout-readers 20 --output data/processed/recommendation_validation.json

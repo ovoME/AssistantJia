@@ -283,6 +283,75 @@ class RecommendationTests(unittest.TestCase):
             self.assertEqual(engine.hot_books()[0]["isbn"], "9780306406157")
             self.assertEqual([row["title"] for row in engine.recommend("0001")], ["虚构文学"])
 
+    def test_batch_validation_reports_aggregates_without_reader_details(self):
+        from data.scripts.validate_recommendations import validate
+
+        _, catalog, loans = engine_for([book(1), book(2), book(3)], [
+            ("private-a", 0), ("private-a", 1), ("private-b", 0), ("private-b", 2),
+        ])
+        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parent) as tmp:
+            folder = Path(tmp)
+            write_source(folder, catalog, loans)
+            report = validate(folder, limit=2, holdout_readers=2)
+            self.assertEqual((report["accepted_rows"], report["reader_count"], report["cold_start_checks"]), (4, 2, 4))
+            self.assertTrue(all(result["queries"] == 2 and result["history_overlap"] == 0
+                                for result in report["strategies"].values()))
+            self.assertEqual(report["holdout"]["training_rows"], 2)
+            self.assertEqual(report["holdout"]["removed_loan_rows"], 2)
+            encoded = json.dumps(report)
+            for private in ("private-a", "private-b", '"reader_id"'):
+                self.assertNotIn(private, encoded)
+
+    def test_empty_batch_validation_and_invalid_limit(self):
+        from data.scripts.validate_recommendations import validate
+
+        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parent) as tmp:
+            folder = Path(tmp)
+            write_source(folder, [], [])
+            report = validate(folder)
+            self.assertEqual(report["reader_count"], 0)
+            self.assertEqual(report["holdout"]["evaluated_readers"], 0)
+            self.assertTrue(all(row["hit_rate"] is None for row in report["holdout"]["metrics"].values()))
+            with self.assertRaises(ValueError):
+                validate(folder, limit=0)
+
+    def test_holdout_removes_all_repeat_loans_and_split_is_deterministic(self):
+        from data.scripts.validate_recommendations import evaluate_holdout
+
+        engine, catalog, loans = engine_for([book(1), book(2), book(3)], [
+            ("a", 0), ("a", 1), ("a", 0), ("a", 1), ("b", 0), ("b", 2),
+        ])
+        first = evaluate_holdout(engine, {row["book_key"]: row for row in catalog}, loans, limit=2, max_readers=2)
+        second = evaluate_holdout(engine, {row["book_key"]: row for row in catalog}, list(reversed(loans)), limit=2, max_readers=2)
+        self.assertEqual(first, second)
+        self.assertEqual(first["evaluated_readers"], 2)
+        self.assertEqual(first["removed_loan_rows"], 3)
+        self.assertEqual(first["training_rows"], 3)
+
+    def test_validation_keeps_distinct_isbn_editions_separate(self):
+        from data.scripts.validate_recommendations import validate
+
+        _, catalog, loans = engine_for([book(1, title="同名虚构书"), book(2, title="同名虚构书")], [("a", 0), ("b", 1)])
+        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parent) as tmp:
+            folder = Path(tmp)
+            write_source(folder, catalog, loans)
+            report = validate(folder, holdout_readers=0)
+            self.assertEqual(report["strategies"]["hybrid"]["returned"], 2)
+
+    def test_validation_cli_writes_only_summary_json(self):
+        _, catalog, loans = engine_for([book(1), book(2)], [("private-a", 0), ("private-b", 1)])
+        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parent) as tmp:
+            folder = Path(tmp)
+            write_source(folder, catalog, loans)
+            output = folder / "report.json"
+            result = subprocess.run([
+                sys.executable, "-S", "-W", "error", "-m", "data.scripts.validate_recommendations",
+                "--data-dir", str(folder), "--output", str(output), "--holdout-readers", "0",
+            ], cwd=ROOT, capture_output=True, text=True, encoding="utf-8", env=self._utf8_env())
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout), json.loads(output.read_text(encoding="utf-8")))
+            self.assertNotIn("private-", result.stdout + result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
