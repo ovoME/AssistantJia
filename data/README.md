@@ -1,6 +1,6 @@
-# 小嘉 C1 借阅数据清洗与统计
+# 小嘉 C1 数据清洗统计与 C2 推荐
 
-这是 C 负责的数据模块首版。它把借阅 Excel 或 CSV 转成统一的借阅流水、图书主数据、读者列表、质量报告及看板统计。测试数据全部由程序生成，不是馆方数据。
+这是 C 负责的数据模块。C1 把借阅 Excel 或 CSV 转成统一的借阅流水、图书主数据、读者列表、质量报告及看板统计；C2 基于这些输出提供热门、分类偏好、协同过滤及混合推荐。测试数据全部由程序生成，不是馆方数据。
 
 ## 运行
 
@@ -11,7 +11,7 @@ python -m pip install -r data/requirements.txt
 python -m data.scripts.generate_demo --rows 36908
 python -m data.scripts.clean_data --input data/demo/borrow_records_demo.csv --dataset-label simulated
 python -m data.scripts.analyze
-python -m unittest discover -s data/tests -v
+python -W error -m unittest discover -s data/tests -v
 ```
 
 运行后查看 `data/processed/quality_report.md`、`summary.json` 和 `dashboard.json`。`api_summary.json`、`api_hot_books.json`、`api_categories.json`、`api_publishers.json` 是供 A 接入的响应文件，字段对齐已有前端约定；它们尚未由 HTTP 服务发布。所有命令从仓库根目录运行。
@@ -75,10 +75,32 @@ python -m data.scripts.analyze
 python -m data.scripts.generate_demo --rows 36908 --output data/demo/borrow_records_demo.csv
 ```
 
+## C2 推荐
+
+先完成上面的 C1 清洗，再从仓库根目录运行：
+
+```powershell
+# 不传读者为热门兜底；分类先筛选再取前 N 本，支持 T 大类和 TP 等字母前缀
+python -m data.scripts.recommend --strategy popular --category TP --limit 10
+# 使用完整已读集合过滤，默认混合协同过滤、分类偏好和热门度
+python -m data.scripts.recommend --reader-id 000002 --limit 5
+# 单独运行分类偏好或协同过滤，可指定其他 C1 输出目录
+python -m data.scripts.recommend --reader-id 000002 --strategy category --category I
+python -m data.scripts.recommend --reader-id 000002 --strategy collaborative --data-dir data/processed
+# 可选写入本地文件；默认只向终端输出 JSON
+python -m data.scripts.recommend --reader-id 000002 --output data/processed/private/recommendations.json
+```
+
+`hybrid`、`popular`、`category`、`collaborative` 四种策略均过滤该读者的全部已借书籍；无历史或无相似读者时使用可用的分类偏好或热门度，不补回已读书。缺 ISBN 的不同副本在完整题名、作者、出版社精确一致，且不涉及多个 ISBN 时可合并为同一推荐候选。仅从历史借阅中出现过的书目推荐，不能表示全馆书目或实时可借书。
+
+C2 运行时仅依赖 Python 标准库，读入 `books.csv`、完整 `borrow_records.csv` 和可选的 `quality_report.json`，不依赖 LLM、向量库或 pandas。清洗仍使用 C1 的 pandas/openpyxl 依赖。输入缺失或不同批次的文件计数不匹配时明确报错。
+
+返回现有 `{code, message, data}` 封装及 `dataset_label`，书单保留 `title/author/isbn/call_number/reason`，另外提供 `book_key/count/category/score/strategy`。结果没有读者标识、邻居明细或臆造的架位、可借数量。算法、Python 调用和 A 的接入说明见 [C2 推荐交付约定](../docs/c2-recommendation.md)。
+
 ## 团队对接
 
 模块位于 `data/`，测试位于 `data/tests/`，轻量依赖位于 `data/requirements.txt`，与现有后端依赖下限保持一致。前端和现有后端服务入口由各自负责人接入。`docs/c-data-contract.md` 说明原生统计字段与现有接口字段的映射；`total_titles` 使用规范化题名数，和 `book_key` 数分开。
 
 仓库 `.gitignore` 排除真实原始数据、生成数据和模拟 CSV，保留目录占位。真实借阅记录、证件号、逐人画像留在本地数据目录。
 
-下一阶段是 C2 分类热门推荐；C3 OPAC 需要真实地址及接口说明；C4 知识库需要馆方原始规则；C5 统计 HTTP 接口需与 A、D 的现有结构及鉴权方式对齐。本包交付的是 C1，不把其他模块标记为已完成。
+C1 与 C2 算法、文件及命令行已交付。现有后端推荐和统计路由仍使用 mock，A 接入本模块时需与 D 对齐认证身份、响应中的数据标识及数据刷新方式。C3 OPAC 需要真实地址及接口说明；C4 知识库需要馆方原始规则；C5 统计 HTTP 数据接入仍待完成。
