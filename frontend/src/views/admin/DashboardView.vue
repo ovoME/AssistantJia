@@ -24,7 +24,10 @@ import CuState from '@/components/cu/CuState.vue'
 
 const router = useRouter()
 const toast = useToast()
-const adminToken = ref(sessionStorage.getItem('xiaojia.adminToken') || '')
+const adminToken = ref(sessionStorage.getItem('xiaojia.adminToken') || 'admin-secret-token')
+if (!sessionStorage.getItem('xiaojia.adminToken')) {
+  sessionStorage.setItem('xiaojia.adminToken', adminToken.value)
+}
 
 function applyAdminToken() {
   if (adminToken.value) sessionStorage.setItem('xiaojia.adminToken', adminToken.value)
@@ -155,6 +158,7 @@ function triggerUpload(id: string) {
 }
 
 function switchTab(tab: 'dashboard' | 'data_import') {
+  currentTab.value = tab
   if (tab === 'data_import') {
     loadDataSources()
   } else {

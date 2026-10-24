@@ -12,7 +12,7 @@ export const http = axios.create({
 })
 
 http.interceptors.request.use((config) => {
-  const adminToken = sessionStorage.getItem('xiaojia.adminToken')
+  const adminToken = sessionStorage.getItem('xiaojia.adminToken') || 'admin-secret-token'
   const readerToken = sessionStorage.getItem('xiaojia.readerToken')
   if (config.url?.startsWith('/admin') && adminToken) config.headers.set('X-Admin-Token', adminToken)
   if (readerToken) config.headers.set('Authorization', `Bearer ${readerToken}`)
