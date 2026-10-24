@@ -59,3 +59,14 @@ def test_api_book_review(client):
     assert data['title'] == '三体'
     assert '三体' in data['review']
     assert len(data['review']) > 20
+
+
+def test_api_data_management_sources(client):
+    res = client.get('/api/admin/data/sources')
+    assert res.status_code == 200
+    data = res.json()['data']
+    assert len(data) == 8
+    names = [item['name'] for item in data]
+    assert '备考联盟数据' in names
+    assert '学者库数据' in names
+    assert '座位系统数据' in names

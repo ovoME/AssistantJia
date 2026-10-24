@@ -8,6 +8,7 @@ from app.auth import active_reader
 from app.agent.prompts import SYSTEM_PROMPT
 from app.agent.tools.data_client import data_client
 from app.services import local_data
+from app.services.data_manager import data_manager
 
 SESSION_HISTORIES = OrderedDict()
 
@@ -59,7 +60,12 @@ class LibraryAgent:
                 reply += "\n核对日期：" + info["retrieved_at"][:10] + "。临时安排以馆方公告为准。"
             return "search_knowledge", {"question": q}, info, [], reply
 
-        # 3. 书目与馆藏检索
+        # 3. 多源数据智能问答 (备考联盟、学者库、门禁客流、自习座位、研讨室)
+        multi_ans = data_manager.query_multimodal_knowledge(q)
+        if multi_ans:
+            return "query_multimodal_data", {"domain": multi_ans["domain"], "query": q}, multi_ans, [], multi_ans["reply"]
+
+        # 4. 书目与馆藏检索
         if quoted or any(word in q for word in ["找", "查书", "搜书", "馆藏", "索书号", "架位", "书架", "几楼", "有没有", "检索", "借本", "查查", "书目"]):
             query = search_query(q)
             if query:
@@ -68,7 +74,14 @@ class LibraryAgent:
                 reply = "在本地书目快照中找到以下图书，索书号见卡片；未核实实时可借数量和架位。" if cards else "本地书目没有匹配结果，可以换用书名、作者或索书号关键词。"
                 return "search_books", {"query": query}, payload, cards, reply
 
-        return None, {}, {}, [], "我是小嘉，可以查询本地书目、推荐图书，以及根据馆方资料回答借阅规则。实时借阅操作请在馆方系统办理。"
+        # 5. 身份介绍与引导问候
+        if any(word in q for word in ["你是谁", "你叫什么", "介绍一下", "名字", "是谁", "身份"]):
+            return None, {}, {}, [], "学弟学妹好呀！我是厦门大学嘉庚学院图书馆的AI数字馆员「小嘉」。平时我可以帮你查找馆藏书目、定位索书号与架位、推荐热门榜单好书，还能为你解答借期、续借、研讨室预约等图书馆规章哦！"
+
+        if any(word in q for word in ["比如", "怎么用", "能做什么", "举个例子", "可以问什么", "帮助", "有什么功能"]):
+            return None, {}, {}, [], "你可以直接问我这些问题试一试：\n• 查书找架位：“帮我查查《三体》在几楼哪个书架”\n• 借阅规则咨询：“普通图书能借多少天？快到期怎么续借？”\n• 热门好书推荐：“最近大家都在借什么热门好书”\n• 备考与学者：“考研有什么备考资源？”、“有哪些人工智能领域的学者？”\n• 场馆与客流：“图书馆现在人多吗？研讨室怎么借？”"
+
+        return None, {}, {}, [], "学弟学妹好呀！我是图书馆AI数字馆员小嘉。你可以直接问我某本书在哪个书架，或者问问借阅规则、备考资源与热门推荐哦！"
 
     async def stream_chat(self, message, session_id="default", reader_id=None):
         history = get_session_history(session_id)

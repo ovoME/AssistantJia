@@ -64,6 +64,8 @@ data/processed/*
 !data/processed/.gitkeep
 data/demo/*
 !data/demo/.gitkeep
+data/imported/*
+!data/imported/.gitkeep
 *.xlsx
 *.xls
 *.csv.gz
