@@ -1,7 +1,13 @@
 # 「小嘉」部署流水线：构建镜像 → 推送 GHCR → SSH 部署到服务器
 # 触发：手动（workflow_dispatch）或 push 到 main
-# 需要的仓库 Secrets：
-#   DEPLOY_HOST / DEPLOY_USER / DEPLOY_SSH_KEY / GHCR_PAT（推送镜像用）
+#
+# 需要的仓库 Secrets（仅"正式上线部署"才需要，初赛材料不依赖它）：
+#   DEPLOY_HOST / DEPLOY_USER / DEPLOY_SSH_KEY   部署目标，缺任一项则整条流水线跳过
+#   GHCR_PAT                                     可选，不配则自动回退到内置 GITHUB_TOKEN
+#
+# 为什么要有 guard job：secrets 不能用于 job 级 if，且未配置时 ssh-action / login-action
+# 会直接失败。初赛阶段若把 develop 合到 main，会导致 main 分支变红。guard 把"缺凭证"
+# 变成 skipped 而不是 failure，配置好 secrets 后自动恢复生效。
 name: Deploy
 
 on:
@@ -16,9 +22,37 @@ env:
   IMAGE_FRONTEND: ghcr.io/${{ github.repository }}/xiaojia-frontend
 
 jobs:
+  guard:
+    name: 检查部署凭证
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - id: check
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          missing=""
+          if [ -z "$DEPLOY_HOST" ]; then missing="$missing DEPLOY_HOST"; fi
+          if [ -z "$DEPLOY_USER" ]; then missing="$missing DEPLOY_USER"; fi
+          if [ -z "$DEPLOY_SSH_KEY" ]; then missing="$missing DEPLOY_SSH_KEY"; fi
+          if [ -n "$missing" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=部署已跳过::缺少 secrets:$missing 。初赛阶段可忽略；配置后本流水线自动生效。"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "部署凭证齐全，开始构建与部署"
+          fi
+
   build-and-push:
     name: 构建并推送镜像
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: guard
+    if: needs.guard.outputs.ready == 'true'
     permissions:
       contents: read
       packages: write
@@ -29,7 +63,8 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_PAT }}
+          # 未单独配置 GHCR_PAT 时回退到内置 token（配合上方 packages: write 即可推送）
+          password: ${{ secrets.GHCR_PAT || secrets.GITHUB_TOKEN }}
       - name: 构建并推送后端镜像
         uses: docker/build-push-action@v6
         with:
@@ -50,7 +85,9 @@ jobs:
   deploy:
     name: SSH 部署到生产服务器
     runs-on: ubuntu-latest
-    needs: build-and-push
+    timeout-minutes: 15
+    needs: [guard, build-and-push]
+    if: needs.guard.outputs.ready == 'true'
     environment: production
     steps:
       - uses: actions/checkout@v4
@@ -63,7 +100,8 @@ jobs:
           script: |
             set -e
             cd /opt/xiaojia
-            git pull --ff-only || true
+            # 服务器侧代码仅用于拿 docker-compose.yml；拉取失败时沿用现有文件继续部署镜像
+            git pull --ff-only || echo "git pull 跳过，使用服务器现有文件"
             docker compose pull
             docker compose up -d
             docker image prune -f
