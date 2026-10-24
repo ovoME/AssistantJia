@@ -1,0 +1,25 @@
+# ===== 可选：RAG / 向量检索与缓存扩展 =====
+#
+# 默认不安装（CI 与默认 Docker 镜像都不装），原因见 requirements.txt 顶部说明。
+# 需要启用时：
+#   pip install -r requirements-ml.txt
+#   或构建镜像时：docker build --build-arg INSTALL_ML=true -t xiaojia-backend ./backend
+#
+# 启用前提：app/rag/retriever.py 已从占位实现改为真实向量检索。
+# 注意磁盘占用：sentence-transformers 会连带安装 torch 与 CUDA 运行库，约 4-6 GB。
+
+# ---- 向量数据库 ----
+chromadb>=0.4.24,<2
+
+# ---- Embedding 模型 ----
+sentence-transformers>=2.6,<4
+
+# ---- LangChain 全量生态（仅在需要 chains / community loaders 时）----
+langchain>=0.2,<2
+langchain-community>=0.2,<2
+
+# ---- OpenAI 原生 SDK（langchain-openai 已覆盖大部分场景，保留供直连）----
+openai>=1.20,<3
+
+# ---- 会话缓存与状态存储 ----
+redis>=5.0,<8

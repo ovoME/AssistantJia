@@ -1,29 +1,25 @@
-# FastAPI 核心与 ASGI 服务器
-fastapi>=0.110.0
-uvicorn[standard]>=0.28.0
-pydantic>=2.6.0
-pydantic-settings>=2.2.0
-python-dotenv>=1.0.0
+# ===== 「小嘉」后端运行依赖（CI 与 Docker 镜像只需这一份）=====
+#
+# 为什么 RAG 重依赖不在这里：
+#   sentence-transformers 会连带安装 torch 及整套 CUDA 运行库
+#   （nvidia_cufft 214MB / nvidia_cusolver 201MB / triton 248MB …，累计数 GB），
+#   GitHub Actions 免费 runner 磁盘不足，会直接 Disk quota exceeded 让 CI 变红。
+#   当前 app/rag/retriever.py 是占位实现（return []），这些包一次都没被 import，
+#   因此拆到 requirements-ml.txt，按需安装。
 
-# 大模型与 Agent 框架 (LangChain 生态)
-langchain>=0.2.0
-langchain-core>=0.2.0
-langchain-community>=0.2.0
-langchain-openai>=0.1.0
-openai>=1.20.0
-httpx>=0.27.0
+# ---- FastAPI 核心与 ASGI 服务器 ----
+fastapi>=0.110,<1
+uvicorn[standard]>=0.28,<1
+pydantic>=2.6,<3
+pydantic-settings>=2.2,<3
+python-dotenv>=1.0,<2
 
-# 向量数据库与检索增强 (RAG)
-chromadb>=0.4.24
-sentence-transformers>=2.6.0
+# ---- 大模型调用 ----
+# 配置 LLM_API_KEY 时走 LangChain 真实工具调用；未配置时自动降级为关键词规则引擎
+langchain-core>=0.2,<2
+langchain-openai>=0.1,<2
+httpx>=0.27,<1
 
-# 数据处理与分析
-pandas>=2.2.0
-openpyxl>=3.1.2
-
-# 缓存与状态存储
-redis>=5.0.0
-
-# 测试与工具
-pytest>=8.0.0
-pytest-asyncio>=0.23.0
+# ---- 测试 ----
+pytest>=8,<10
+pytest-asyncio>=0.23,<2
