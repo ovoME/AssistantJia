@@ -43,3 +43,19 @@ def test_recommend_uses_verified_identity(client):
     keys = {row['book_key'] for row in response.json()['data']}
     assert not keys & {'isbn:'+demo_isbn(1), 'isbn:'+demo_isbn(3)}
     assert client.get('/api/recommend?reader_id=someone-else', headers={'Authorization':'Bearer '+token}).status_code == 403
+
+
+def test_api_book_review(client):
+    headers = {'X-Admin-Token': settings.ADMIN_TOKEN}
+    # 测试空书名报错
+    res_empty = client.post('/api/admin/book-review', json={'title': ''}, headers=headers)
+    assert res_empty.status_code == 200
+    assert res_empty.json()['code'] == 4000
+
+    # 测试正常生成导读
+    res = client.post('/api/admin/book-review', json={'title': '三体', 'author': '刘慈欣'}, headers=headers)
+    assert res.status_code == 200
+    data = res.json()['data']
+    assert data['title'] == '三体'
+    assert '三体' in data['review']
+    assert len(data['review']) > 20

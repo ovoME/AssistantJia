@@ -28,8 +28,9 @@ def recommendation_card(row, label):
 def search_query(message):
     quoted = re.search(r"《([^》]+)》", message)
     if quoted:
-        return quoted.group(1)
-    text = re.sub(r"^(请|麻烦|帮我|我想|给我|一下|查找|查询|查一下|查|找|搜|搜索|有关|关于)+", "", message.strip())
+        return quoted.group(1).strip()
+    text = re.sub(r"^(请问|请|麻烦|帮我|我想|给我|馆里|有没有|查找|查询|查一下|查|找|搜|搜索|有关|关于)+", "", message.strip())
+    text = re.sub(r"^(有没有关于|有没有|关于)+", "", text.strip())
     return re.sub(r"(相关的书|相关图书|的书|在哪.*|在几楼.*|有没有.*|可以借吗.*|能借吗.*|[？?。])$", "", text).strip()
 
 
@@ -40,6 +41,16 @@ class LibraryAgent:
     def _prepare(self, message, reader_id):
         q = message.strip()
         quoted = "《" in q
+
+        # 1. 优先判定个性化与热门推荐意图（如“推荐几本热门好书”）
+        if any(word in q for word in ["推荐", "好书", "看什么", "榜单", "热门", "书单"]):
+            service = local_data.borrowing()
+            rows = data_client.get_recommendations(reader_id)
+            cards = [recommendation_card(row, service.engine.dataset_label) for row in rows]
+            reply = "这是根据历史借阅样本生成的" + ("个性化" if reader_id else "热门") + "推荐；可借状态和架位尚未核实。" if cards else "该筛选条件下没有剩余推荐候选。"
+            return "recommend_books", {"limit": 5}, {"recommendations": rows, **service.metadata()}, cards, reply
+
+        # 2. 规章制度与入馆咨询
         if not quoted and any(word in q for word in ["续借", "借期", "多久", "几天", "多少天", "几本", "几册", "多少册", "多少本", "上限", "开馆", "闭馆", "开放", "几点", "座位", "暂离", "积分", "规则", "规定", "预约", "委托", "研讨室", "假期", "充电宝", "校外", "现刊", "工具书", "报纸", "押金", "罚款"]):
             info = data_client.search_rules_knowledge(q)
             reply = info["answer"]
@@ -47,18 +58,16 @@ class LibraryAgent:
                 reply += "\n\n来源：\n" + "\n".join(f"[{i}] {row['title']}：{row['url']}" for i, row in enumerate(info["sources"], 1))
                 reply += "\n核对日期：" + info["retrieved_at"][:10] + "。临时安排以馆方公告为准。"
             return "search_knowledge", {"question": q}, info, [], reply
-        if any(word in q for word in ["推荐", "好书", "看什么", "榜单", "热门"]):
-            service = local_data.borrowing()
-            rows = data_client.get_recommendations(reader_id)
-            cards = [recommendation_card(row, service.engine.dataset_label) for row in rows]
-            reply = "这是根据历史借阅样本生成的" + ("个性化" if reader_id else "热门") + "推荐；可借状态和架位尚未核实。" if cards else "该筛选条件下没有剩余推荐候选。"
-            return "recommend_books", {"limit": 5}, {"recommendations": rows, **service.metadata()}, cards, reply
-        if quoted or any(word in q for word in ["找", "查书", "搜书", "馆藏", "索书号", "架位", "书架", "几楼"]):
+
+        # 3. 书目与馆藏检索
+        if quoted or any(word in q for word in ["找", "查书", "搜书", "馆藏", "索书号", "架位", "书架", "几楼", "有没有", "检索", "借本", "查查", "书目"]):
             query = search_query(q)
-            payload = local_data.catalog().response(query, 5)
-            cards = [{**row, "dataset_label": payload["dataset_label"], "reservation_supported": False} for row in payload["data"]]
-            reply = "在本地书目快照中找到以下图书，索书号见卡片；未核实实时可借数量和架位。" if cards else "本地书目没有匹配结果，可以换用书名、作者或索书号关键词。"
-            return "search_books", {"query": query}, payload, cards, reply
+            if query:
+                payload = local_data.catalog().response(query, 5)
+                cards = [{**row, "dataset_label": payload["dataset_label"], "reservation_supported": False} for row in payload["data"]]
+                reply = "在本地书目快照中找到以下图书，索书号见卡片；未核实实时可借数量和架位。" if cards else "本地书目没有匹配结果，可以换用书名、作者或索书号关键词。"
+                return "search_books", {"query": query}, payload, cards, reply
+
         return None, {}, {}, [], "我是小嘉，可以查询本地书目、推荐图书，以及根据馆方资料回答借阅规则。实时借阅操作请在馆方系统办理。"
 
     async def stream_chat(self, message, session_id="default", reader_id=None):
