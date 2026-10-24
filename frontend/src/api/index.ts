@@ -15,6 +15,7 @@ import type {
   CategoryStat,
   BookStat,
   BorrowTrendPoint,
+  PublisherStat,
 } from '@/types'
 import {
   USE_MOCK,
@@ -31,6 +32,16 @@ import {
 } from '@/mock/data'
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+export interface UsageReport {
+  dataset_label: string
+  datasets: Record<string, { source_file: string; rows: number; distinct_source_readers: number | null; observed_date_min: string | null; observed_date_max: string | null }>
+  limitations: string[]
+}
+export async function getUsage(): Promise<UsageReport> {
+  if (USE_MOCK) return { dataset_label: 'simulated', datasets: {}, limitations: ['前端模拟模式未提供资源使用统计'] }
+  return http.get<unknown, UsageReport>('/admin/stats/usage')
+}
 
 /* ---------- 对话（流式） ---------- */
 export async function sendChat(
@@ -59,7 +70,7 @@ export async function sendChat(
     }
     return
   }
-  return streamChat(payload, onEvent, signal)
+  return streamChat({ ...payload, reader_id: undefined }, onEvent, signal)
 }
 
 /* ---------- 馆藏检索 ---------- */
@@ -76,37 +87,38 @@ export async function searchBooks(query: string, limit = 5): Promise<Book[]> {
 }
 
 /* ---------- 借阅 ---------- */
-export async function getMyBorrows(readerId: string): Promise<BorrowRecord[]> {
+export async function getMyBorrows(_readerId: string): Promise<BorrowRecord[]> {
   if (USE_MOCK) {
     await delay(200)
     return mockBorrows
   }
-  return http.get<unknown, BorrowRecord[]>(`/reader/${readerId}/borrows`)
+  const target = sessionStorage.getItem('xiaojia.readerToken') ? 'me' : 'demo-reader'
+  return http.get<unknown, BorrowRecord[]>(`/reader/${target}/borrows`)
 }
 
-export async function renewBook(readerId: string, bookId: string): Promise<RenewResult> {
+export async function renewBook(_readerId: string, bookId: string): Promise<RenewResult> {
   if (USE_MOCK) {
     await delay(400)
     return { new_due_date: '2026-12-01', renew_count: 1 }
   }
-  return http.post<unknown, RenewResult>('/renew', { reader_id: readerId, book_id: bookId })
+  return http.post<unknown, RenewResult>('/renew', { reader_id: sessionStorage.getItem('xiaojia.readerToken') ? 'me' : 'demo-reader', book_id: bookId })
 }
 
-export async function reserveBook(readerId: string, isbn: string): Promise<ReserveResult> {
+export async function reserveBook(_readerId: string, isbn: string): Promise<ReserveResult> {
   if (USE_MOCK) {
     await delay(400)
     return { queue_position: 1, notify_channel: '站内消息' }
   }
-  return http.post<unknown, ReserveResult>('/reserve', { reader_id: readerId, isbn })
+  return http.post<unknown, ReserveResult>('/reserve', { reader_id: sessionStorage.getItem('xiaojia.readerToken') ? 'me' : 'demo-reader', isbn })
 }
 
 /* ---------- 推荐 ---------- */
-export async function getRecommend(readerId: string, limit = 5): Promise<RecommendBook[]> {
+export async function getRecommend(_readerId: string, limit = 5): Promise<RecommendBook[]> {
   if (USE_MOCK) {
     await delay(200)
     return mockRecommend.slice(0, limit)
   }
-  return http.get<unknown, RecommendBook[]>('/recommend', { params: { reader_id: readerId, limit } })
+  return http.get<unknown, RecommendBook[]>('/recommend', { params: { limit } })
 }
 
 /* ---------- 管理端 ---------- */
@@ -135,12 +147,12 @@ export async function getCategories(): Promise<CategoryStat[]> {
 }
 
 /** 出版社 TOP10（待后端契约：GET /api/admin/stats/publishers） */
-export async function getPublishers(limit = 10): Promise<BookStat[]> {
+export async function getPublishers(limit = 10): Promise<PublisherStat[]> {
   if (USE_MOCK) {
     await delay(200)
-    return mockPublishers.slice(0, limit)
+    return mockPublishers.slice(0, limit).map((row) => ({ publisher: row.title, count: row.count }))
   }
-  return http.get<unknown, BookStat[]>('/admin/stats/publishers', { params: { limit } })
+  return http.get<unknown, PublisherStat[]>('/admin/stats/publishers', { params: { limit } })
 }
 
 /** 借阅趋势：近N天每日借阅量（待后端契约：GET /api/admin/stats/trend） */
@@ -158,5 +170,6 @@ export async function getPurchaseAdvice(): Promise<string> {
     await delay(300)
     return mockAdvice
   }
-  return http.post<unknown, string>('/admin/purchase-advice')
+  const result = await http.post<unknown, { report: string }>('/admin/purchase-advice')
+  return result.report
 }

@@ -20,6 +20,13 @@ const borrows = ref<BorrowRecord[]>([])
 const borrowLoading = ref(false)
 const borrowError = ref('')
 const recommends = ref<RecommendBook[]>([])
+const readerToken = ref(sessionStorage.getItem('xiaojia.readerToken') || '')
+async function applyReaderToken() {
+  if (readerToken.value) sessionStorage.setItem('xiaojia.readerToken', readerToken.value)
+  else sessionStorage.removeItem('xiaojia.readerToken')
+  try { recommends.value = await getRecommend(chat.readerId, 4) }
+  catch (e) { toast.error((e as Error).message) }
+}
 
 // 馆藏搜索
 const searchShow = ref(false)
@@ -100,8 +107,9 @@ async function onRenew(book: BorrowRecord) {
     const r = await renewBook(chat.readerId, book.book_id)
     book.due_date = r.new_due_date
     book.renew_count = r.renew_count
+    book.can_renew = r.can_renew
     book.is_overdue = false
-    toast.success(`续借成功，新到期日 ${r.new_due_date}`)
+    toast.success(`${book.dataset_label === 'simulated' ? '模拟续借完成，未办理真实业务' : '续借完成'}；新到期日 ${r.new_due_date}`)
   } catch (e) {
     toast.error((e as Error).message || '续借失败')
   }
@@ -140,9 +148,15 @@ async function onRenew(book: BorrowRecord) {
         <div class="hello cu-fade-in">
           <div class="logo">📚</div>
           <h1>你好，我是小嘉！</h1>
-          <p>能帮你查馆藏、找架位、续借、预约，也懂借阅规则。</p>
+          <p>查询书目、推荐阅读、解答馆方规则；实时业务以官方系统为准。</p>
         </div>
         <div class="quick">
+          <details>
+            <summary>读者凭证（可选）</summary>
+            <input v-model="readerToken" type="password" placeholder="输入已签发的访问凭证" aria-label="读者访问凭证" autocomplete="off" />
+            <button class="cu-btn cu-btn-plain" @click="applyReaderToken">使用凭证</button>
+            <p>未提供凭证时显示热门推荐。</p>
+          </details>
           <button
             v-for="(q, i) in quickQuestions"
             :key="q"
@@ -160,7 +174,7 @@ async function onRenew(book: BorrowRecord) {
           <div class="rec-row">
             <button
               v-for="r in recommends"
-              :key="r.isbn"
+              :key="r.book_key || r.isbn || r.title"
               class="lg lg-tap rec-card"
               @click="onSend(`我想找《${r.title}》`)"
             >
@@ -194,6 +208,7 @@ async function onRenew(book: BorrowRecord) {
       <CuState v-else-if="borrowError" type="error" :message="borrowError" @retry="openBorrows" />
       <div v-else-if="borrows.length" class="borrow-list">
         <div v-for="b in borrows" :key="b.book_id" class="borrow-item lg-panel">
+          <p v-if="b.dataset_label === 'simulated'">模拟借阅记录；按钮仅演示流程，不会办理真实借阅。</p>
           <div class="b-title">{{ b.title }}</div>
           <div class="b-meta">
             <span>应还：{{ b.due_date }}</span>
@@ -204,10 +219,10 @@ async function onRenew(book: BorrowRecord) {
           <div class="b-meta">已续借 {{ b.renew_count }} 次</div>
           <button
             class="cu-btn cu-btn-teal cu-btn-sm"
-            :disabled="b.renew_count >= 1"
+            :disabled="!b.can_renew"
             @click="onRenew(b)"
           >
-            {{ b.renew_count >= 1 ? '不可再续' : '一键续借' }}
+            {{ !b.can_renew ? '不可续借' : (b.dataset_label === 'simulated' ? '模拟续借' : '一键续借') }}
           </button>
         </div>
       </div>
@@ -230,7 +245,7 @@ async function onRenew(book: BorrowRecord) {
       <CuState v-if="searchLoading" type="loading" message="正在检索馆藏…" />
       <template v-else-if="searchSearched">
         <div v-if="searchResults.length" class="search-results">
-          <BookCard v-for="b in searchResults" :key="b.isbn" :book="b" :reader-id="chat.readerId" />
+          <BookCard v-for="b in searchResults" :key="b.book_key || b.isbn || b.title" :book="b" :reader-id="chat.readerId" />
         </div>
         <CuState v-else type="empty" message="没找到相关图书，换个关键词试试，或直接问小嘉～" />
       </template>

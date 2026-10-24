@@ -5,6 +5,10 @@ export interface ApiResponse<T = unknown> {
   code: number
   message: string
   data: T
+  dataset_label?: string
+  is_live?: boolean
+  scope?: string
+  limitations?: string[]
 }
 
 /** 馆藏图书（检索/卡片） */
@@ -13,9 +17,14 @@ export interface Book {
   author: string
   isbn: string
   call_number: string
-  location: string
-  available: number
+  location: string | null
+  available: number | null
   status: string
+  book_key?: string
+  reason?: string
+  dataset_label?: string
+  is_live?: boolean
+  reservation_supported?: boolean
 }
 
 /** 借阅记录 */
@@ -26,10 +35,13 @@ export interface BorrowRecord {
   due_date: string
   renew_count: number
   is_overdue: boolean
+  can_renew?: boolean
+  dataset_label?: string
 }
 
 /** 个性化推荐图书 */
 export interface RecommendBook {
+  book_key?: string
   title: string
   author: string
   isbn: string
@@ -41,6 +53,7 @@ export interface RecommendBook {
 export interface RenewResult {
   new_due_date: string
   renew_count: number
+  can_renew?: boolean
 }
 
 /** 预约结果 */
@@ -78,7 +91,8 @@ export interface AdminSummary {
   total_borrows: number
   total_readers: number
   total_titles: number
-  avg_borrow_per_reader: number
+  avg_borrow_per_reader: number | null
+  dataset_label?: string
 }
 
 /** 分类统计项 */
@@ -100,3 +114,5 @@ export interface BorrowTrendPoint {
   date: string
   count: number
 }
+
+export interface PublisherStat { publisher: string; count: number; publisher_missing?: boolean }

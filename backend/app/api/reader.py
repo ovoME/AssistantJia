@@ -1,39 +1,49 @@
 from typing import List
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from app.auth import reader_identity, resolve_reader
+from app.config import settings
 from app.schemas.common import ApiResponse
 from app.schemas.book import BorrowRecord, RenewRequest, RenewResult, ReserveRequest, ReserveResult
-from app.agent.tools.data_client import data_client
+from app.services.local_data import provider
 
 router = APIRouter(tags=["Reader & Borrow"])
 
+
+def authorized(reader_id, identity):
+    if reader_id == "me":
+        if identity is None:
+            from fastapi import HTTPException
+            raise HTTPException(401, "请先取得本人读者凭证。")
+        return identity
+    if settings.OPAC_PROVIDER == "demo" and reader_id == "demo-reader" and identity is None:
+        return reader_id
+    return resolve_reader(reader_id, identity)
+
+
+def metadata():
+    return {"dataset_label": "simulated" if settings.OPAC_PROVIDER == "demo" else "unknown", "is_live": False,
+            "scope": "demo_business" if settings.OPAC_PROVIDER == "demo" else "unavailable"}
+
+
 @router.get("/reader/{reader_id}/borrows", response_model=ApiResponse[List[BorrowRecord]])
-async def get_reader_borrows(reader_id: str):
-    """获取读者在借图书列表"""
-    records = data_client.get_user_borrows(reader_id)
-    return ApiResponse.ok(data=[BorrowRecord(**r) for r in records])
+def get_reader_borrows(reader_id: str, identity=Depends(reader_identity)):
+    reader = authorized(reader_id, identity)
+    return ApiResponse.ok(data=provider().current_borrows(reader), **metadata())
+
 
 @router.post("/renew", response_model=ApiResponse[RenewResult])
-async def renew_endpoint(req: RenewRequest):
-    """办理图书一键续借"""
-    res = data_client.renew_book(reader_id=req.reader_id, book_id=req.book_id)
-    if not res.get("success"):
-        return ApiResponse.fail(code=4001, message=res.get("message", "续借失败"))
-    return ApiResponse.ok(
-        data=RenewResult(
-            new_due_date=res["new_due_date"],
-            renew_count=res["renew_count"]
-        ),
-        message=res.get("message", "续借成功")
-    )
+def renew_endpoint(req: RenewRequest, identity=Depends(reader_identity)):
+    reader = authorized(req.reader_id, identity)
+    result = provider().renew(reader, req.book_id)
+    if not result.get("success"):
+        return ApiResponse.fail(code=result.get("code", 4001), message=result["message"])
+    return ApiResponse.ok(data=RenewResult(**result), message=result["message"], **metadata())
+
 
 @router.post("/reserve", response_model=ApiResponse[ReserveResult])
-async def reserve_endpoint(req: ReserveRequest):
-    """在线预约图书"""
-    res = data_client.reserve_book(reader_id=req.reader_id, isbn=req.isbn)
-    return ApiResponse.ok(
-        data=ReserveResult(
-            queue_position=res["queue_position"],
-            notify_channel=res["notify_channel"]
-        ),
-        message=res.get("message", "预约成功")
-    )
+def reserve_endpoint(req: ReserveRequest, identity=Depends(reader_identity)):
+    reader = authorized(req.reader_id, identity)
+    result = provider().reserve(reader, req.isbn)
+    if not result.get("success"):
+        return ApiResponse.fail(code=result.get("code", 4002), message=result["message"])
+    return ApiResponse.ok(data=ReserveResult(**result), message=result["message"], **metadata())

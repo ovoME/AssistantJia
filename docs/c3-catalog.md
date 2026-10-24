@@ -48,7 +48,7 @@ metadata = catalog.info()
 
 ## A、B、D 的接入边界
 
-A 可在数据客户端调用 Catalog.search/response，按 book_key 获取详情，ISBN 查询使用 lookup_isbn，不能在未命中时返回其他书。现有后端 Book 模型与前端类型把 location、available 声明为非空，接入前需允许 null，并在界面显示“未提供/待查询”。应保留来源和 is_live，聊天话术不能把本地查询描述成“最新 OPAC 状态”。此次提供数据层和 CLI，不直接切换现有 mock 路由。
+A 可在数据客户端调用 Catalog.search/response，按 book_key 获取详情，ISBN 查询使用 lookup_isbn，不能在未命中时返回其他书。后端 Book 模型与前端类型现已允许 location、available 为 null，并在界面显示未提供或待查询。应保留来源和 is_live，聊天话术不能把本地查询描述成“最新 OPAC 状态”。数据层与 CLI 后续已接入 HTTP 与聊天卡片，见 [C4/C5 服务说明](c4-c5-services.md)。
 
 导出文件 ID 与借阅流水的财产号尚无可靠编号映射。不能按数值相似、前后位置或猜测匹配；书目查找可独立使用，但不能据此把未读过滤和实时可借量连接到所有推荐候选。后续需编号对照表或一致的脱敏规则。
 

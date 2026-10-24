@@ -4,6 +4,10 @@ FastAPI 主应用入口
 """
 
 from fastapi import FastAPI
+from fastapi import Request, HTTPException
+from fastapi.responses import JSONResponse
+from app.services.provider import ProviderUnavailable
+from app.services.local_data import DataUnavailable
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.api import api_router
@@ -18,11 +22,29 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+
+@app.exception_handler(FileNotFoundError)
+@app.exception_handler(ProviderUnavailable)
+@app.exception_handler(DataUnavailable)
+async def unavailable_handler(request: Request, exc):
+    message = str(exc) if isinstance(exc, (ProviderUnavailable, DataUnavailable)) else "本地数据尚未初始化，请先构建数据文件。"
+    return JSONResponse(status_code=503, content={"code": 5001, "message": message, "data": None})
+
+
+@app.exception_handler(ValueError)
+async def invalid_handler(request: Request, exc):
+    return JSONResponse(status_code=422, content={"code": 4000, "message": "参数或数据格式无效，请核对输入。", "data": None})
+
+
+@app.exception_handler(PermissionError)
+async def permission_handler(request: Request, exc):
+    return JSONResponse(status_code=403, content={"code": 4003, "message": "请使用本人已认证身份。", "data": None})
+
 # 允许跨域请求 (适配 Vue 3 本地开发与生产部署)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

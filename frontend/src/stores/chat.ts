@@ -34,7 +34,7 @@ export const useChatStore = defineStore('chat', () => {
   const initial = loadSession()
   const messages = ref<ChatMessage[]>(initial.messages)
   const loading = ref(false)
-  const readerId = ref('2023001') // 演示用，登录接入后替换
+  const readerId = ref('demo-reader') // 仅模拟业务使用；真实个性化身份由已验证令牌确定
   const sessionId = ref(initial.sessionId)
   let abortController: AbortController | null = null
 

@@ -2,10 +2,13 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 class AdminSummary(BaseModel):
-    total_borrows: int = Field(default=36908, description="总借阅人次")
-    total_readers: int = Field(default=3580, description="持证读者数")
-    total_titles: int = Field(default=22318, description="馆藏图书种数")
-    avg_borrow_per_reader: float = Field(default=10.31, description="人均借阅册数")
+    total_borrows: int = Field(..., description="历史样本借阅流水数")
+    total_readers: int = Field(..., description="历史样本不同读者数")
+    total_titles: int = Field(..., description="历史样本规范化题名数")
+    avg_borrow_per_reader: Optional[float] = None
+    dataset_label: str = "unknown"
+    scope: str = "historical_borrow_records"
+    is_live: bool = False
 
 class CategoryStat(BaseModel):
     category: str = Field(..., description="中图分类大类号，如 I, TP, F")

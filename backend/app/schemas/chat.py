@@ -3,9 +3,9 @@ from pydantic import BaseModel, Field
 from app.schemas.book import Book
 
 class ChatRequest(BaseModel):
-    message: str = Field(..., description="读者提问内容")
-    session_id: str = Field(default="default_session", description="会话ID")
-    reader_id: Optional[str] = Field(default="2023001", description="读者证件号")
+    message: str = Field(..., min_length=1, max_length=2000, description="读者提问内容")
+    session_id: str = Field(default="default_session", max_length=100, description="会话ID")
+    reader_id: Optional[str] = Field(default=None, max_length=100, description="须与认证身份一致")
 
 class ChatHistoryMessage(BaseModel):
     role: str = Field(..., description="user 或 assistant")

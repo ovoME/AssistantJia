@@ -10,7 +10,7 @@ const reserved = ref(false)
 const loading = ref(false)
 
 async function onReserve() {
-  if (reserved.value || loading.value) return
+  if (reserved.value || loading.value || !props.book.reservation_supported) return
   loading.value = true
   try {
     const r = await reserveBook(props.readerId || '2023001', props.book.isbn)
@@ -35,18 +35,20 @@ async function onReserve() {
       <div class="meta">{{ book.author }} · {{ book.call_number }}</div>
       <div class="location">
         <span class="loc-icon">📍</span>
-        <span>{{ book.location }}</span>
+        <span>{{ book.location || '架位未提供，请查询馆方系统' }}</span>
       </div>
+      <div v-if="book.reason" class="meta">{{ book.reason }}</div>
+      <div class="meta">{{ book.dataset_label === 'simulated' ? '模拟数据' : '静态书目' }} · 实时状态未核实</div>
       <div class="footer">
-        <span class="cu-tag" :class="book.available > 0 ? 'cu-tag-green' : 'cu-tag-gray'">
-          {{ book.available > 0 ? `在馆 · 可借 ${book.available} 本` : '已借出' }}
+        <span class="cu-tag" :class="book.available !== null && book.available > 0 ? 'cu-tag-green' : 'cu-tag-gray'">
+          {{ book.available === null ? '可借状态待查询' : (book.available > 0 ? `${book.dataset_label === 'simulated' ? '模拟' : '快照'}可借 ${book.available} 本` : '快照无可借数量') }}
         </span>
         <button
           class="cu-btn cu-btn-sm dark-btn"
-          :disabled="reserved || book.available === 0 || loading"
+          :disabled="reserved || !book.reservation_supported || loading"
           @click="onReserve"
         >
-          {{ reserved ? '已预约' : '预约' }}
+          {{ !book.reservation_supported ? '预约未接入' : (reserved ? '模拟已预约' : '模拟预约') }}
         </button>
       </div>
     </div>

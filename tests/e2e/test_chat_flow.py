@@ -11,7 +11,7 @@
 """
 import pytest
 
-from conftest import HEALTH_URL, assert_ok
+from conftest import HEALTH_URL, ADMIN_TOKEN, assert_ok
 
 
 # ---- 场景1：健康检查 ----
@@ -26,7 +26,7 @@ def test_health():
 # ---- 场景2：图书检索（OPAC） ----
 @pytest.mark.e2e
 def test_book_search(client):
-    body = assert_ok(client.get("/books/search", params={"query": "三体", "limit": 5}))
+    body = assert_ok(client.get("/books/search", params={"query": "Python", "limit": 5}))
     books = body.get("data") or []
     assert len(books) > 0, "应返回检索结果"
     first = books[0]
@@ -34,12 +34,13 @@ def test_book_search(client):
     assert first.get("call_number"), f"缺少索书号: {first}"
     # 架位 / 在馆状态（契约字段，二者至少其一）
     assert ("location" in first) or ("status" in first), f"缺少架位或在馆状态: {first}"
+    assert first['available'] is None and first['is_live'] is False
 
 
 # ---- 场景3：读者当前借阅 ----
 @pytest.mark.e2e
 def test_reader_borrows(client):
-    body = assert_ok(client.get("/reader/2023001/borrows"))
+    body = assert_ok(client.get("/reader/demo-reader/borrows"))
     data = body.get("data")
     assert data is not None, "应返回借阅列表（可为空数组）"
 
@@ -47,7 +48,7 @@ def test_reader_borrows(client):
 # ---- 场景4a：续借（失败须明确话术） ----
 @pytest.mark.e2e
 def test_renew(client):
-    r = client.post("/renew", json={"reader_id": "2023001", "book_id": "B20230911001"})
+    r = client.post("/renew", json={"reader_id": "demo-reader", "book_id": "DEMO-COPY-001"})
     assert r.status_code == 200, r.text
     body = r.json()
     assert "code" in body and "message" in body, f"契约字段缺失: {body}"
@@ -60,7 +61,7 @@ def test_renew(client):
 # ---- 场景4b：预约（失败须明确话术） ----
 @pytest.mark.e2e
 def test_reserve(client):
-    r = client.post("/reserve", json={"reader_id": "2023001", "isbn": "9787111544937"})
+    r = client.post("/reserve", json={"reader_id": "demo-reader", "isbn": "9787111544937"})
     assert r.status_code == 200, r.text
     body = r.json()
     assert "code" in body and "message" in body, f"契约字段缺失: {body}"
@@ -72,7 +73,7 @@ def test_reserve(client):
 # ---- 场景5a：个性化推荐 ----
 @pytest.mark.e2e
 def test_recommend(client):
-    body = assert_ok(client.get("/recommend", params={"reader_id": "2023001", "limit": 5}))
+    body = assert_ok(client.get("/recommend", params={"limit": 5}))
     books = body.get("data") or []
     assert len(books) > 0, "应返回推荐书单"
     assert books[0].get("title"), "推荐条目缺少题名"
@@ -95,9 +96,10 @@ def test_hot_books(client):
 # ---- 场景6：管理端借阅概览 ----
 @pytest.mark.e2e
 def test_admin_summary(client):
-    body = assert_ok(client.get("/admin/stats/summary"))
+    body = assert_ok(client.get("/admin/stats/summary", headers={'X-Admin-Token': ADMIN_TOKEN}))
     data = body.get("data") or {}
-    assert data.get("total_borrows") == 36908, f"借阅总条数口径不符: {data}"
+    assert data.get("total_borrows") == 8, f"虚构服务夹具应含8条流水: {data}"
+    assert body['dataset_label'] == 'simulated'
 
 
 # ---- 场景7：对话 SSE 流式输出 ----

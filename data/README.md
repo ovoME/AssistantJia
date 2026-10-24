@@ -14,7 +14,7 @@ python -m data.scripts.analyze
 python -W error -m unittest discover -s data/tests -v
 ```
 
-运行后查看 `data/processed/quality_report.md`、`summary.json` 和 `dashboard.json`。`api_summary.json`、`api_hot_books.json`、`api_categories.json`、`api_publishers.json` 是供 A 接入的响应文件，字段对齐已有前端约定；它们尚未由 HTTP 服务发布。所有命令从仓库根目录运行。
+运行后查看 `data/processed/quality_report.md`、`summary.json` 和 `dashboard.json`。四份 `api_*.json` 保留为离线响应文件；HTTP 服务现已从同批借阅数据计算统计，字段对齐既有前端约定。所有命令从仓库根目录运行。
 
 真实数据到位后，原文件放到 `data/raw/`，替换输入路径即可：
 
@@ -124,4 +124,16 @@ python -S -W error -m unittest discover -s data/tests -p test_catalog.py -v
 
 仓库 `.gitignore` 排除真实原始数据、生成数据和模拟 CSV，保留目录占位。真实借阅记录、证件号、逐人画像留在本地数据目录。
 
-C1、C2 算法与命令行、C3 本地书目检索均已交付。现有后端推荐和统计路由仍使用 mock，A 接入本模块时需与 D 对齐认证身份、响应中的数据标识及数据刷新方式。实时 OPAC 仍需可核实的接口说明，借阅财产号与馆藏导出 ID 的关联仍需对照资料；C4 知识库需要馆方原始规则；C5 统计 HTTP 数据接入仍待完成。
+C1–C5 的本地数据、推荐、规则检索和统计接口已实现并接入后端与页面。馆方实时业务预留 disabled/demo provider，当前没有执行真实 OPAC 写操作；编号映射和学校 SSO 仍需馆方适配。运行、权限、来源与边界见 [C4/C5 服务说明](../docs/c4-c5-services.md)。
+
+## C4/C5 与资源统计
+
+规则来源为已核对的图书馆官网摘要，支持带引用的本地稀疏向量检索。统计、推荐和目录接口已接入，前端默认访问后端。管理接口需配置访问密钥，个人推荐使用可信签发的读者令牌；无凭证只提供热门推荐。
+
+```powershell
+python -S -m data.scripts.build_knowledge --question "普通图书续借几次"
+python -S -m data.scripts.prepare_demo
+python -m data.scripts.analyze_usage --input-dir "资料目录/图书馆" --dataset-label real --output data/processed/usage.json
+```
+
+资源统计分别处理座位、研讨室、门禁、读者和学者库；不推断跨表编号关系，不生成无依据的利用率。`OPAC_PROVIDER=demo` 才提供显式虚构的当前借阅、续借与预约流程；默认 disabled 不伪造办理成功。详见 [启动与验收](../docs/c4-c5-services.md)。

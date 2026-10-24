@@ -1,5 +1,4 @@
 import json
-import pytest
 from app.agent.tools.search_books import search_books
 from app.agent.tools.renew_book import renew_book
 from app.agent.tools.reserve_book import reserve_book
@@ -7,55 +6,53 @@ from app.agent.tools.get_borrows import get_user_borrows
 from app.agent.tools.recommend import recommend_books
 from app.agent.tools.search_knowledge import search_knowledge
 
+
 def test_search_books():
-    """测试查馆藏工具"""
-    res_str = search_books.invoke({"query": "三体", "limit": 3})
-    data = json.loads(res_str)
-    assert data["status"] == "success"
-    assert len(data["books"]) > 0
-    assert "索书号" not in data["books"][0]  # 英文键
-    assert "call_number" in data["books"][0]
-    assert "location" in data["books"][0]
+    data = json.loads(search_books.invoke({'query':'Python','limit':3}))
+    assert data['status'] == 'success'
+    assert len(data['books']) == 2
+    assert data['books'][0]['available'] is None
+
 
 def test_get_user_borrows():
-    """测试查读者借阅"""
-    res_str = get_user_borrows.invoke({"reader_id": "2023001"})
-    data = json.loads(res_str)
-    assert data["status"] == "success"
-    assert len(data["borrows"]) > 0
+    data = json.loads(get_user_borrows.invoke({'reader_id':'demo-reader'}))
+    assert data['borrows'][0]['dataset_label'] == 'simulated'
+
 
 def test_renew_book_normal():
-    """测试正常续借"""
-    res_str = renew_book.invoke({"reader_id": "2023001", "book_id": "B20230911001"})
-    data = json.loads(res_str)
-    assert data["success"] is True
-    assert "new_due_date" in data
+    data = json.loads(renew_book.invoke({'reader_id':'demo-reader','book_id':'DEMO-COPY-001'}))
+    assert data['success'] is True
+    assert data['is_live'] is False
+    assert '模拟' in data['message']
+
 
 def test_renew_book_limit():
-    """测试超过续借次数上限"""
-    # B20230911002 初始 renew_count=1
-    res_str = renew_book.invoke({"reader_id": "2023001", "book_id": "B20230911002"})
-    data = json.loads(res_str)
-    assert data["success"] is False
-    assert "最大续借上限" in data["message"]
+    for _ in range(3):
+        assert json.loads(renew_book.invoke({'reader_id':'demo-reader','book_id':'DEMO-COPY-001'}))['success']
+    data = json.loads(renew_book.invoke({'reader_id':'demo-reader','book_id':'DEMO-COPY-001'}))
+    assert data['success'] is False
+
 
 def test_reserve_book():
-    """测试在线预约"""
-    res_str = reserve_book.invoke({"reader_id": "2023001", "isbn": "9787536692930"})
-    data = json.loads(res_str)
-    assert data["success"] is True
-    assert data["queue_position"] >= 1
+    data = json.loads(reserve_book.invoke({'reader_id':'demo-reader','isbn':'9780306406157'}))
+    assert data['success'] is True
+    assert data['dataset_label'] == 'simulated'
+
 
 def test_recommend_books():
-    """测试个性化推荐"""
-    res_str = recommend_books.invoke({"reader_id": "2023001", "limit": 2})
-    data = json.loads(res_str)
-    assert data["status"] == "success"
-    assert len(data["recommendations"]) == 2
+    data = json.loads(recommend_books.invoke({'limit':2}))
+    assert data['status'] == 'success'
+    assert len(data['recommendations']) == 2
+
 
 def test_search_knowledge():
-    """测试规则知识库"""
-    res_str = search_knowledge.invoke({"question": "图书能借几天"})
-    data = json.loads(res_str)
-    assert data["found"] is True
-    assert "30" in data["answer"]
+    data = json.loads(search_knowledge.invoke({'question':'图书能借几天'}))
+    assert data['found'] is True
+    assert '60' in data['answer']
+    assert data['sources'][0]['url'] == 'https://library.xujc.com/jyqx/list.htm'
+
+
+def test_tool_cannot_impersonate_reader():
+    data = json.loads(recommend_books.invoke({'reader_id':'someone-else','limit':2}))
+    assert data['status'] == 'error'
+    assert 'recommendations' not in data

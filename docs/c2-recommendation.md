@@ -1,6 +1,6 @@
 # C2 推荐交付约定
 
-交付日期：2026 年 10 月 24 日。输入为 C1 输出，回归测试使用虚构记录，并已在本地使用提供的真实借阅表做功能和离线效果验证。C2 交付历史借阅推荐算法、Python 调用及 CLI；现有 HTTP 路由的数据切换与鉴权需 A、D 接入。
+交付日期：2026 年 10 月 24 日。输入为 C1 输出，回归测试使用虚构记录，并已在本地使用提供的真实借阅表做功能和离线效果验证。C2 交付历史借阅推荐算法、Python 调用及 CLI；后续 HTTP 数据切换与认证已完成，见 [服务接入](c4-c5-services.md)。
 
 ## 输入和生命周期
 
@@ -50,7 +50,7 @@ literature_hot = engine.hot_books(category="I", limit=10)
 response = engine.response(reader_id="000002", limit=5)
 ```
 
-`recommend()` 的参数名兼容现有 `DataClient.get_recommendations(reader_id, limit)`；`hot_books(category, limit)` 可供现有 `/api/hot-books` 使用。A 可在数据客户端初始化时加载引擎，再将两个方法的返回列表交给现有响应模型。运行时需能导入仓库的 `data` 包；现有根目录 Compose 已将 `./data` 挂载到 `/app/data`，单独构建后端镜像时则需另配置代码和数据位置。
+`recommend()` 的参数名兼容现有 `DataClient.get_recommendations(reader_id, limit)`；`hot_books(category, limit)` 可供现有 `/api/hot-books` 使用。现有数据客户端已通过缓存服务加载引擎并接入路由；后端镜像从仓库根构建并复制标准库数据模块，Compose 只读挂载处理结果目录。
 
 response 为 `{code: 0, message: "success", data: [...], dataset_label, limitations}`。每本书含原契约要求的 `title/author/isbn/call_number/reason`，以及 `book_key/publisher/category/category_name/count/score/strategy`。ISBN 缺失仍为空字符串，book_key 用于唯一识别；输出 strategy 表示主要依据（content/collaborative/category/popular）。内容分贡献大于基础分贡献时标记 content；这是新增的输出值，输入策略仍只有 hybrid/popular/category/collaborative 四种。冷启动不会伪称个性化。应保留 dataset_label 和历史样本限制，避免模拟数据被展示成馆方实时数据。
 
