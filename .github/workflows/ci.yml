@@ -61,6 +61,9 @@ jobs:
           if [ -f backend/Dockerfile ]; then docker build -t xiaojia-backend:ci ./backend; else echo "backend/Dockerfile 未合入，跳过"; fi
       - name: 扫描后端镜像（Trivy，报告模式）
         if: ${{ hashFiles('backend/Dockerfile') != '' }}
+        # 扫描为报告模式（exit-code:0），漏洞本身不阻断 CI；
+        # 工具自身故障（DB 下载/网络等）同样不阻断，结果以日志+后续人工核查为准
+        continue-on-error: true
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: xiaojia-backend:ci
@@ -73,6 +76,8 @@ jobs:
           if [ -f frontend/Dockerfile ]; then docker build -t xiaojia-frontend:ci ./frontend; else echo "frontend/Dockerfile 未合入，跳过"; fi
       - name: 扫描前端镜像（Trivy，报告模式）
         if: ${{ hashFiles('frontend/Dockerfile') != '' }}
+        # 同上：报告模式 + 不阻断 CI
+        continue-on-error: true
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: xiaojia-frontend:ci
