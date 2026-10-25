@@ -283,6 +283,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <div class="topbar-actions">
+        <button class="cu-btn cu-btn-plain" @click="router.push('/admin/data')">数据管理</button>
         <input v-model="adminToken" type="password" aria-label="管理端访问密钥" placeholder="管理端访问密钥" autocomplete="off" style="max-width:160px" @keyup.enter="applyAdminToken" />
         <button class="cu-btn cu-btn-plain" @click="applyAdminToken">验证</button>
         <button class="cu-btn cu-btn-plain" @click="loadData" :disabled="loading">
