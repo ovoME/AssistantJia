@@ -6,6 +6,7 @@ import type {
   CategoryStat,
   BookStat,
   BorrowTrendPoint,
+  DataFileInfo,
 } from '../types'
 
 /**
@@ -165,3 +166,17 @@ export const mockBorrowTrend: BorrowTrendPoint[] = (() => {
   }
   return points
 })()
+
+/** 已上传的数据文件列表 */
+export const mockDataFiles: DataFileInfo[] = [
+  {
+    id: 'f-001',
+    filename: '图书借阅数据.xlsx',
+    kind: 'borrow',
+    rows: 36908,
+    size_kb: 1420,
+    status: 'ready',
+    uploaded_at: '2026-10-20T10:23:00+08:00',
+    message: '已入库：36,908 条借阅流水',
+  },
+]

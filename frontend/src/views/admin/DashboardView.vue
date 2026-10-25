@@ -398,6 +398,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="topbar-actions">
+        <button class="cu-btn cu-btn-plain" @click="router.push('/admin/data')">📁 文件管理页</button>
         <input
           v-model="adminToken"
           type="password"

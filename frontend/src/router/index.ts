@@ -15,6 +15,12 @@ const router = createRouter({
       component: () => import('@/views/admin/DashboardView.vue'),
       meta: { title: '管理端 · 数据看板' },
     },
+    {
+      path: '/admin/data',
+      name: 'admin-data',
+      component: () => import('@/views/admin/DataManageView.vue'),
+      meta: { title: '管理端 · 数据管理' },
+    },
   ],
 })
 

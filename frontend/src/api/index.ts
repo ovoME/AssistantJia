@@ -15,6 +15,7 @@ import type {
   CategoryStat,
   BookStat,
   BorrowTrendPoint,
+  DataFileInfo,
   PublisherStat,
 } from '@/types'
 import {
@@ -29,6 +30,7 @@ import {
   mockBorrowTrend,
   mockSseChunks,
   mockAdvice,
+  mockDataFiles,
 } from '@/mock/data'
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -212,4 +214,34 @@ export async function quickSyncDataset(category: string): Promise<any> {
 export async function quickSyncAllDatasets(): Promise<any> {
   const res = await http.post('/admin/data/quick-sync-all')
   return (res as any).data
+}
+
+/* ---------- 数据管理 ---------- */
+/** 列出已上传的数据文件（契约待后端：GET /api/admin/data/files） */
+export async function listDataFiles(): Promise<DataFileInfo[]> {
+  if (USE_MOCK) {
+    await delay(200)
+    return mockDataFiles
+  }
+  return http.get<unknown, DataFileInfo[]>('/admin/data/files')
+}
+
+/** 上传数据文件（契约待后端：POST /api/admin/data/upload，multipart/form-data） */
+export async function uploadDataFile(file: File): Promise<DataFileInfo> {
+  if (USE_MOCK) {
+    await delay(800)
+    return {
+      id: 'mock-' + Date.now(),
+      filename: file.name,
+      kind: file.name.includes('借阅') ? 'borrow' : 'other',
+      rows: null,
+      size_kb: Math.max(1, Math.round(file.size / 1024)),
+      status: 'processing',
+      uploaded_at: new Date().toISOString(),
+      message: '已接收，后台处理中（演示模式）',
+    }
+  }
+  const form = new FormData()
+  form.append('file', file)
+  return http.post<unknown, DataFileInfo>('/admin/data/upload', form)
 }
