@@ -100,3 +100,15 @@ export interface BorrowTrendPoint {
   date: string
   count: number
 }
+
+/** 数据文件（管理端数据管理页） */
+export interface DataFileInfo {
+  id: string
+  filename: string
+  kind: 'borrow' | 'catalog' | 'gate' | 'seat' | 'room' | 'other'
+  rows: number | null
+  size_kb: number
+  status: 'ready' | 'processing' | 'error'
+  uploaded_at: string
+  message?: string
+}

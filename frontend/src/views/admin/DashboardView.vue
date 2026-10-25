@@ -274,6 +274,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <div class="topbar-actions">
+        <button class="cu-btn cu-btn-plain" @click="router.push('/admin/data')">数据管理</button>
         <button class="cu-btn cu-btn-plain" @click="loadData" :disabled="loading">
           {{ loading ? '刷新中…' : '刷新数据' }}
         </button>
