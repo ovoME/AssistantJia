@@ -1,6 +1,6 @@
 # C4/C5 与数据服务接入
 
-交付日期：2026-10-25。C1–C3 已合并，本次把规则知识库、统计、推荐和静态书目查询接入现有 FastAPI/Vue 页面。原始文件及逐人借阅不进入 Git 或镜像。
+交付日期：2026-10-25。C1–C3 已合并，本次把规则知识库、统计、推荐和静态书目查询接入现有 FastAPI/Vue 页面。原始文件及逐人借阅不进入 Git 或镜像；真实资料包由授权成员从团队共享盘获取，data/shared只保留校验清单，模拟联调源在data/fixtures/integration，详见[共享说明](c-shared-data.md)。
 
 ## 完成范围
 
@@ -68,7 +68,7 @@ python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
 
 缓存按文件路径、纳秒修改时间和大小识别重载；加载前后变更或计数不一致会失败，不提供模拟结果兜底。这个检查不能证明两个同计数但不同读者关系的文件来自同批，因此仍要求按不可变目录发布。
 
-容器从仓库根构建：`docker build -f backend/Dockerfile -t xiaojia-backend .`。镜像只复制运行代码与公开规则摘要，`.dockerignore` 排除原始数据、处理结果和凭证；Compose 只读挂载 data/processed。配置路径须适用于容器内的 /app 工作目录。没有数据时健康检查仍成功，具体数据接口明确返回 503，便于运维区分应用存活与数据就绪。
+容器从仓库根构建：`docker build -f backend/Dockerfile -t xiaojia-backend .`。镜像复制运行代码、公开规则摘要及独立小型模拟夹具，`.dockerignore` 排除原始数据、处理结果和凭证；Compose 只读挂载 data/processed。配置路径须适用于容器内的 /app 工作目录。没有数据时健康检查仍成功，具体数据接口明确返回 503，便于运维区分应用存活与数据就绪。
 
 ## HTTP 与身份边界
 

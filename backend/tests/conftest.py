@@ -19,6 +19,7 @@ def fixture_data(monkeypatch):
         directory = Path(tmp)
         prepare(directory)
         monkeypatch.setattr(settings, "DATA_DIRECTORY", str(directory))
+        monkeypatch.setattr(settings, "DATA_PROFILE", "local")
         monkeypatch.setattr(settings, "CATALOG_DATABASE", str(directory / "catalog.sqlite3"))
         monkeypatch.setattr(settings, "KNOWLEDGE_SOURCE", str(ROOT / "data" / "knowledge" / "rules.json"))
         monkeypatch.setattr(settings, "OPAC_PROVIDER", "demo")

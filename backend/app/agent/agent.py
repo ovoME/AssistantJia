@@ -55,9 +55,11 @@ class LibraryAgent:
             return "recommend_books", {"limit": 5}, {"recommendations": rows, **service.metadata()}, cards, reply
         if quoted or any(word in q for word in ["找", "查书", "搜书", "馆藏", "索书号", "架位", "书架", "几楼"]):
             query = search_query(q)
-            payload = local_data.catalog().response(query, 5)
-            cards = [{**row, "dataset_label": payload["dataset_label"], "reservation_supported": False} for row in payload["data"]]
+            payload = local_data.search_books_response(query, 5)
+            cards = [{**row, "dataset_label": payload["dataset_label"], "reservation_supported": row.get("reservation_supported", False)} for row in payload["data"]]
             reply = "在本地书目快照中找到以下图书，索书号见卡片；未核实实时可借数量和架位。" if cards else "本地书目没有匹配结果，可以换用书名、作者或索书号关键词。"
+            if cards and settings.DATA_PROFILE == "integration":
+                reply = "找到以下模拟联调图书。卡片架位、可借数量和状态均为模拟数据，非馆方实时结果。"
             return "search_books", {"query": query}, payload, cards, reply
         return None, {}, {}, [], "我是小嘉，可以查询本地书目、推荐图书，以及根据馆方资料回答借阅规则。实时借阅操作请在馆方系统办理。"
 

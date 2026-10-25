@@ -21,8 +21,9 @@ def authorized(reader_id, identity):
 
 
 def metadata():
-    return {"dataset_label": "simulated" if settings.OPAC_PROVIDER == "demo" else "unknown", "is_live": False,
-            "scope": "demo_business" if settings.OPAC_PROVIDER == "demo" else "unavailable"}
+    demo = settings.OPAC_PROVIDER == "demo" or settings.DATA_PROFILE == "integration"
+    return {"dataset_label": "simulated" if demo else "unknown", "is_live": False,
+            "scope": "demo_business" if demo else "unavailable"}
 
 
 @router.get("/reader/{reader_id}/borrows", response_model=ApiResponse[List[BorrowRecord]])
