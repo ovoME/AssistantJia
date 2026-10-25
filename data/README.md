@@ -1,5 +1,7 @@
 # 小嘉 C1 数据清洗统计、C2 推荐与 C3 本地书目检索
 
+团队联调可直接使用已提交的[模拟数据与真实资料导入脚本](../docs/c-shared-data.md)，不再依赖作者本机桌面。真实资料包从团队共享盘获取，不进入Git。显式运行`python -m data.scripts.run_integration`使用模拟批次；管理和个人接口保持鉴权。
+
 这是 C 负责的数据模块。C1 把借阅 Excel 或 CSV 转成统一的借阅流水、图书主数据、读者列表、质量报告及看板统计；C2 基于这些输出提供热门、分类偏好、协同过滤及内容融合推荐；C3 提供可查询的本地只读书目检索库。仓库测试数据由程序生成；外部提供的真实数据仅在本地验证，汇总见 [C2 优化评估](../docs/c2-optimization.md)。
 
 ## 运行
@@ -122,7 +124,7 @@ python -S -W error -m unittest discover -s data/tests -p test_catalog.py -v
 
 模块位于 `data/`，测试位于 `data/tests/`，轻量依赖位于 `data/requirements.txt`，与现有后端依赖下限保持一致。前端和现有后端服务入口由各自负责人接入。`docs/c-data-contract.md` 说明原生统计字段与现有接口字段的映射；`total_titles` 使用规范化题名数，和 `book_key` 数分开。
 
-仓库 `.gitignore` 排除真实原始数据、生成数据和模拟 CSV，保留目录占位。真实借阅记录、证件号、逐人画像留在本地数据目录。
+本地raw/processed/demo输出和data/shared/*.zip均由.gitignore忽略。原始文件及逐人借阅不进入Git或镜像；授权成员从团队共享盘取得真实资料后，使用data/shared中的清单校验并导入。独立模拟源提交到data/fixtures/integration，同事无需真实资料即可联调。
 
 C1–C5 的本地数据、推荐、规则检索和统计接口已实现并接入后端与页面。馆方实时业务预留 disabled/demo provider，当前没有执行真实 OPAC 写操作；编号映射和学校 SSO 仍需馆方适配。运行、权限、来源与边界见 [C4/C5 服务说明](../docs/c4-c5-services.md)。
 

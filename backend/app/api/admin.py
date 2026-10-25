@@ -43,7 +43,8 @@ def get_publisher_stats(limit: int = Query(10, ge=1, le=100)):
 @router.get("/stats/trend", response_model=ApiResponse[list])
 def get_trend(days: int = Query(30, ge=1, le=366)):
     service = borrowing()
-    return ApiResponse.ok(data=[], message="借阅源没有日期，无法生成每日趋势。", **service.metadata())
+    rows = service.trend(days)
+    return ApiResponse.ok(data=rows, message="按样本日期汇总，窗口终点为样本末日。" if rows else "借阅源没有日期，无法生成每日趋势。", **service.metadata())
 
 
 @router.get("/stats/usage", response_model=ApiResponse[dict])

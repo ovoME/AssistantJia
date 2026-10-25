@@ -16,6 +16,8 @@ class Book(BaseModel):
     holdings_snapshot: Optional[dict] = None
     reason: Optional[str] = None
     reservation_supported: bool = False
+    updated_at: Optional[str] = None
+    as_of: Optional[str] = None
 
 class BorrowRecord(BaseModel):
     book_id: str = Field(..., description="图书条码号/财产号")

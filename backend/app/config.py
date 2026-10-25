@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     OPAC_BASE_URL: str = Field(default="http://opac.example.edu.cn", alias="OPAC_BASE_URL")
 
     DATA_DIRECTORY: str = str(PROJECT_ROOT / "data" / "processed")
+    DATA_PROFILE: Literal["local", "integration"] = "local"
+    INTEGRATION_DATA_DIRECTORY: str = str(PROJECT_ROOT / "data" / "processed" / "shared-integration-v1")
     CATALOG_DATABASE: str = str(PROJECT_ROOT / "data" / "processed" / "catalog.sqlite3")
     KNOWLEDGE_SOURCE: str = str(PROJECT_ROOT / "data" / "knowledge" / "rules.json")
     USAGE_REPORT: str = str(PROJECT_ROOT / "data" / "processed" / "usage.json")

@@ -69,9 +69,11 @@ class LibraryAgent:
         if quoted or any(word in q for word in ["找", "查书", "搜书", "馆藏", "索书号", "架位", "书架", "几楼", "有没有", "检索", "借本", "查查", "书目"]):
             query = search_query(q)
             if query:
-                payload = local_data.catalog().response(query, 5)
-                cards = [{**row, "dataset_label": payload["dataset_label"], "reservation_supported": False} for row in payload["data"]]
+                payload = local_data.search_books_response(query, 5)
+                cards = [{**row, "dataset_label": payload["dataset_label"], "reservation_supported": row.get("reservation_supported", False)} for row in payload["data"]]
                 reply = "在本地书目快照中找到以下图书，索书号见卡片；未核实实时可借数量和架位。" if cards else "本地书目没有匹配结果，可以换用书名、作者或索书号关键词。"
+                if cards and settings.DATA_PROFILE == "integration":
+                    reply = "找到以下模拟联调图书。卡片架位、可借数量和状态均为模拟数据，非馆方实时结果。"
                 return "search_books", {"query": query}, payload, cards, reply
 
         # 5. 身份介绍与引导问候
@@ -82,6 +84,7 @@ class LibraryAgent:
             return None, {}, {}, [], "你可以直接问我这些问题试一试：\n• 查书找架位：“帮我查查《三体》在几楼哪个书架”\n• 借阅规则咨询：“普通图书能借多少天？快到期怎么续借？”\n• 热门好书推荐：“最近大家都在借什么热门好书”\n• 备考与学者：“考研有什么备考资源？”、“有哪些人工智能领域的学者？”\n• 场馆与客流：“图书馆现在人多吗？研讨室怎么借？”"
 
         return None, {}, {}, [], "学弟学妹好呀！我是图书馆AI数字馆员小嘉。你可以直接问我某本书在哪个书架，或者问问借阅规则、备考资源与热门推荐哦！"
+
 
     async def stream_chat(self, message, session_id="default", reader_id=None):
         history = get_session_history(session_id)

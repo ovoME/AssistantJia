@@ -6,7 +6,7 @@ from app.auth import ensure_reader
 class DataClient:
     @staticmethod
     def search_books_opac(query, limit=5):
-        return local_data.catalog().search(query, limit)
+        return local_data.search_books_response(query, limit)["data"]
 
     @staticmethod
     def get_user_borrows(reader_id):

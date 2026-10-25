@@ -1,5 +1,7 @@
 # 📑 AssistantJia 前后端 API 接口契约规范 (Draft v1.1)
 
+> **数据来源**：模拟联调夹具随仓库提供（`data/fixtures/integration/`）；**真实资料包不进入 Git**，需从团队共享盘获取后放到 `data/shared/`，见 [C 模块共享数据指南](c-shared-data.md)。显式 `DATA_PROFILE=integration` 时提供带模拟标签的库存、日期和编号对照；`local` 档位下真实源缺失字段保持未知，身份检查不变。
+
 > **后端框架**：FastAPI  
 > **前端框架**：Vue 3 + Axios + EventSource / fetch ReadableStream  
 > **统一响应规范**：非流式接口统一采用 `{ "code": 0, "message": "success", "data": ... }`
@@ -464,7 +466,7 @@ data: {"type": "done"}
 - **Method**: `GET`
 - **Path**: `/api/data/status`
 - **语义**: 供前端判断各能力是否可用，决定是否显示"未接入"提示。
-- **Response**:
+- **Response（默认，`DATA_PROFILE=local`）**:
 ```json
 {
   "code": 0,
@@ -475,13 +477,40 @@ data: {"type": "done"}
     "recommendations": "historical_sample",
     "rules": "official_summary",
     "business": "disabled",
+    "data_profile": "local",
     "personalization_requires_auth": true,
     "admin_requires_auth": true
   }
 }
 ```
 
-> `business` 取值 `disabled`（默认，实时业务全部不可用）或 `demo`（仅虚构演示）。前端据此禁用"续借/预约"按钮。
+- **Response（显式 `DATA_PROFILE=integration`，模拟联调）**:
+```json
+{
+  "code": 0,
+  "message": "success",
+  "is_live": false,
+  "data": {
+    "catalog": "synthetic_fixture",
+    "recommendations": "historical_sample",
+    "rules": "official_summary",
+    "business": "integration_demo",
+    "data_profile": "integration",
+    "personalization_requires_auth": true,
+    "admin_requires_auth": true
+  }
+}
+```
+
+| 字段 | 取值 | 含义 |
+|---|---|---|
+| `catalog` | `static_snapshot` \| `synthetic_fixture` | 目录数据来源。`synthetic_fixture` 仅在 `integration` 档位出现 |
+| `recommendations` | `historical_sample` | 历史借阅样本，非实时 |
+| `rules` | `official_summary` | 人工核对的馆方规则摘要 |
+| `business` | `disabled` \| `demo` \| `integration_demo` | 实时业务适配层状态 |
+| `data_profile` | `local` \| `integration` | 当前数据档位 |
+
+> `business` 为 `disabled` 时前端必须禁用"续借/预约"按钮。`demo` / `integration_demo` 只演示虚构记录，响应必带 `dataset_label: "simulated"`，前端必须同时显示"模拟"标签。`integration` 档位需先执行 `python -S -m data.scripts.prepare_shared --dataset integration`。
 
 ---
 

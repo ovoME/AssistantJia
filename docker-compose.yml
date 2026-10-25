@@ -12,6 +12,8 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - CHROMA_HOST=chroma
       - CHROMA_PORT=8000
+      - DATA_PROFILE=${DATA_PROFILE:-local}
+      - INTEGRATION_DATA_DIRECTORY=/app/integration-data
       - DATA_DIRECTORY=${DATA_DIRECTORY:-/app/data/processed/service-demo}
       - CATALOG_DATABASE=${CATALOG_DATABASE:-/app/data/processed/service-demo/catalog.sqlite3}
       - KNOWLEDGE_SOURCE=${KNOWLEDGE_SOURCE:-/app/data/knowledge/rules.json}
