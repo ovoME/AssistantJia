@@ -70,3 +70,30 @@ def test_api_data_management_sources(client):
     assert '备考联盟数据' in names
     assert '学者库数据' in names
     assert '座位系统数据' in names
+
+
+def test_api_data_management_files(client):
+    res = client.get('/api/admin/data/files')
+    assert res.status_code == 200
+    data = res.json()['data']
+    assert isinstance(data, list)
+    if data:
+        first = data[0]
+        assert 'id' in first
+        assert 'filename' in first
+        assert 'kind' in first
+        assert 'status' in first
+        assert 'size_kb' in first
+
+
+def test_api_data_management_upload_general(client):
+    csv_content = "证件号,读者姓名,院系\n2022001,测试读者,信息科学与技术学院\n"
+    files = {"file": ("读者测试数据.csv", csv_content.encode("utf-8"), "text/csv")}
+    res = client.post('/api/admin/data/upload', files=files)
+    assert res.status_code == 200
+    body = res.json()
+    assert body['code'] == 0
+    data = body['data']
+    assert data['kind'] == 'catalog'
+    assert data['status'] == 'ready'
+    assert data['filename'] == '读者测试数据.csv'
