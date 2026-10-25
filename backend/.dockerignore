@@ -1,0 +1,13 @@
+# 构建上下文排除项（减小镜像体积、避免敏感文件进镜像）
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+data/
+.env
+.env.*
+!.env.example
+logs/
+*.log

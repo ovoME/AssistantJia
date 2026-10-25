@@ -11,6 +11,14 @@ export const http = axios.create({
   timeout: 15000,
 })
 
+http.interceptors.request.use((config) => {
+  const adminToken = sessionStorage.getItem('xiaojia.adminToken')
+  const readerToken = sessionStorage.getItem('xiaojia.readerToken')
+  if (config.url?.startsWith('/admin') && adminToken) config.headers.set('X-Admin-Token', adminToken)
+  if (readerToken) config.headers.set('Authorization', `Bearer ${readerToken}`)
+  return config
+})
+
 http.interceptors.response.use(
   (resp) => {
     const body = resp.data as ApiResponse
@@ -23,7 +31,7 @@ http.interceptors.response.use(
     return body.data as never
   },
   (error) => {
-    return Promise.reject(error)
+    return Promise.reject(new Error(error.response?.data?.message || error.response?.data?.detail || error.message || '请求失败'))
   },
 )
 
@@ -56,7 +64,8 @@ export async function streamChat(
 ): Promise<void> {
   const resp = await fetch('/api/chat', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(sessionStorage.getItem('xiaojia.readerToken')
+      ? { Authorization: `Bearer ${sessionStorage.getItem('xiaojia.readerToken')}` } : {}) },
     body: JSON.stringify(payload),
     signal,
   })

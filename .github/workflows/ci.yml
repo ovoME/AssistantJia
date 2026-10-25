@@ -1,0 +1,147 @@
+# 「小嘉」CI 流水线：lint/test → build → 集成测试（E2E）
+# 触发：push / PR 到 main、develop
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: 后端测试
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: 安装依赖
+        # 三重试吸收网络抖动；重依赖已由 #11 拆到 requirements-ml.txt，避免 CI 磁盘超限
+        run: |
+          for i in 1 2 3; do
+            if pip install -r requirements.txt; then exit 0; fi
+            echo "pip 安装失败，第 $i 次重试…"
+            sleep 15
+          done
+          exit 1
+      - name: 单元测试
+        run: |
+          if [ -d tests ]; then python -m pytest tests -q; else echo "backend/tests 未合入，跳过"; fi
+
+  frontend:
+    name: 前端构建
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: 安装依赖
+        run: npm ci
+      - name: 类型检查 + 构建
+        run: npm run build
+
+  docker-build:
+    name: Docker 镜像构建与漏洞扫描
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: 构建后端镜像
+        run: |
+          if [ ! -f backend/Dockerfile ]; then echo "backend/Dockerfile 未合入，跳过"; exit 0; fi
+          for i in 1 2 3; do
+            if docker build -f backend/Dockerfile -t xiaojia-backend:ci .; then exit 0; fi
+            echo "后端镜像构建失败，第 $i 次重试…"
+            sleep 20
+          done
+          exit 1
+      - name: 扫描后端镜像（Trivy，报告模式）
+        if: ${{ hashFiles('backend/Dockerfile') != '' }}
+        # 扫描为报告模式（exit-code:0），漏洞本身不阻断 CI；
+        # 工具自身故障（DB 下载/网络等）同样不阻断，结果以日志+后续人工核查为准
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: xiaojia-backend:ci
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 0
+      - name: 构建前端镜像
+        run: |
+          if [ ! -f frontend/Dockerfile ]; then echo "frontend/Dockerfile 未合入，跳过"; exit 0; fi
+          for i in 1 2 3; do
+            if docker build -t xiaojia-frontend:ci ./frontend; then exit 0; fi
+            echo "前端镜像构建失败，第 $i 次重试…"
+            sleep 20
+          done
+          exit 1
+      - name: 扫描前端镜像（Trivy，报告模式）
+        if: ${{ hashFiles('frontend/Dockerfile') != '' }}
+        # 同上：报告模式 + 不阻断 CI
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: xiaojia-frontend:ci
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 0
+
+  integration:
+    name: 集成测试（docker compose + E2E）
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # 仅在全栈代码合入 develop/main 后运行；backend/Dockerfile 未合入时由步骤级守卫跳过，
+    # 避免后端未合入期间 compose 构建失败导致 develop 变红
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
+    needs: [backend, frontend, docker-build]
+    steps:
+      - uses: actions/checkout@v4
+      - name: 后端Dockerfile未合入则跳过
+        if: ${{ hashFiles('backend/Dockerfile') == '' }}
+        run: echo "backend/Dockerfile 未合入，跳过集成测试"
+      - name: 复制环境变量
+        if: ${{ hashFiles('backend/Dockerfile') != '' }}
+        run: |
+          cp .env.example .env
+          python -S -m data.scripts.prepare_demo
+          python -c "from pathlib import Path; p=Path('.env'); p.write_text(p.read_text()+'\nADMIN_TOKEN=ci-only-admin-token\nOPAC_PROVIDER=demo\n')"
+      - name: 启动全栈
+        if: ${{ hashFiles('backend/Dockerfile') != '' }}
+        run: docker compose up -d --build
+      - name: 等待服务就绪
+        if: ${{ hashFiles('backend/Dockerfile') != '' }}
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/health; then exit 0; fi
+            sleep 5
+          done
+          echo "服务未就绪" && exit 1
+      - name: 运行 E2E 集成测试
+        if: ${{ hashFiles('backend/Dockerfile') != '' }}
+        run: |
+          python -m pip install pytest httpx
+          BASE_URL=http://localhost/api E2E_ADMIN_TOKEN=ci-only-admin-token pytest -q tests/e2e
+      - name: 收集日志（失败时）
+        if: failure()
+        run: docker compose logs --tail=200 backend

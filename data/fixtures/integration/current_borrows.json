@@ -1,0 +1,80 @@
+{
+  "demo-reader": [
+    {
+      "book_id": "DEMO-JGG-000001",
+      "book_key": "isbn:9787000000018",
+      "title": "三体",
+      "borrow_date": "2026-09-30",
+      "due_date": "2026-11-29",
+      "renew_count": 0,
+      "is_overdue": false,
+      "dataset_label": "simulated",
+      "is_live": false
+    }
+  ],
+  "demo-reader-008": [
+    {
+      "book_id": "DEMO-JGG-000002",
+      "book_key": "isbn:9787000000018",
+      "title": "三体",
+      "borrow_date": "2026-09-30",
+      "due_date": "2026-11-29",
+      "renew_count": 3,
+      "is_overdue": false,
+      "dataset_label": "simulated",
+      "is_live": false
+    }
+  ],
+  "demo-reader-010": [
+    {
+      "book_id": "DEMO-JGG-000003",
+      "book_key": "isbn:9787000000025",
+      "title": "平凡的世界",
+      "borrow_date": "2026-09-30",
+      "due_date": "2026-11-29",
+      "renew_count": 0,
+      "is_overdue": false,
+      "dataset_label": "simulated",
+      "is_live": false
+    }
+  ],
+  "demo-reader-012": [
+    {
+      "book_id": "DEMO-JGG-000004",
+      "book_key": "isbn:9787000000025",
+      "title": "平凡的世界",
+      "borrow_date": "2026-09-30",
+      "due_date": "2026-11-29",
+      "renew_count": 0,
+      "is_overdue": false,
+      "dataset_label": "simulated",
+      "is_live": false
+    }
+  ],
+  "demo-peer": [
+    {
+      "book_id": "DEMO-JGG-000005",
+      "book_key": "isbn:9787000000032",
+      "title": "Python编程：从入门到实践",
+      "borrow_date": "2026-09-30",
+      "due_date": "2026-11-29",
+      "renew_count": 0,
+      "is_overdue": false,
+      "dataset_label": "simulated",
+      "is_live": false
+    }
+  ],
+  "demo-reader-004": [
+    {
+      "book_id": "DEMO-JGG-000006",
+      "book_key": "isbn:9787000000032",
+      "title": "Python编程：从入门到实践",
+      "borrow_date": "2026-09-30",
+      "due_date": "2026-11-29",
+      "renew_count": 0,
+      "is_overdue": false,
+      "dataset_label": "simulated",
+      "is_live": false
+    }
+  ]
+}

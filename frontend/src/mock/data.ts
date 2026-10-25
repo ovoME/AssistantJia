@@ -13,7 +13,7 @@ import type {
  * Mock 数据：后端（A）还没写好前，前端用它独立开发。
  * 后端接口就绪后，在 `.env.local` 里设 VITE_USE_MOCK=false 即可关闭，无需改源码。
  */
-export const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
+export const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
 export const mockBooks: Book[] = [
   {

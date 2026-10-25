@@ -60,14 +60,14 @@ AssistantJia/
 
 ---
 
-## 👥 四人团队分工
+## 👥 四人团队分工与成员名单
 
-| 角色 | 负责人职责 | 核心任务与技术栈 |
-| :--- | :--- | :--- |
-| **角色 A：后端 Agent 工程师** | 智能体大脑与业务中枢 | FastAPI、LangChain、ReAct Agent 架构、6大业务工具封装、SSE流式输出、幻觉兜底 |
-| **角色 B：Web 前端工程师** | 读者端与管理端交互呈现 | Vue 3、Vite、TypeScript、Naive UI / Element Plus、ECharts、流式打字效果 |
-| **角色 C：数据与算法工程师** | 数据清洗、推荐算法与知识库 | 3.7万借阅数据清洗与画像、中图法分类与协同过滤推荐、ChromaDB RAG 向量库构建 |
-| **角色 D：全栈集成与项目协调** | 仓库治理、容器化与集成测试 | 仓库与分支管理、接口契约定义、Docker Compose 编排、CI/CD、答辩演示保障 |
+| 角色 | 负责人 (GitHub) | 负责人职责 | 核心任务与技术栈 |
+| :--- | :--- | :--- | :--- |
+| **角色 A：后端 Agent 工程师** | [@ovoME](https://github.com/ovoME) (项目Owner) | 智能体大脑与业务中枢 | FastAPI、LangChain、ReAct Agent 架构、6大业务工具封装、SSE流式输出、幻觉兜底 |
+| **角色 B：Web 前端工程师** | [@bakashinji1204](https://github.com/bakashinji1204) | 读者端与管理端交互呈现 | Vue 3、Vite、TypeScript、Naive UI / Element Plus、ECharts、流式打字效果 |
+| **角色 C：数据与算法工程师** | [@haidann](https://github.com/haidann) | 数据清洗、推荐算法与知识库 | 3.7万借阅数据清洗与画像、中图法分类与协同过滤推荐、ChromaDB RAG 向量库构建 |
+| **角色 D：全栈集成与项目协调** | [@Hellan-w](https://github.com/Hellan-w) | 仓库治理、容器化与集成测试 | 仓库与分支管理、接口契约定义、Docker Compose 编排、CI/CD、答辩演示保障 |
 
 > 📌 详细的角色实操手册与现成 Prompt 请参考 [docs/TEAM_GUIDE.md](docs/TEAM_GUIDE.md)。
 
@@ -116,6 +116,22 @@ cd frontend
 npm install
 npm run dev
 ```
+
+---
+
+## 数据清洗与统计 C1
+
+在仓库根目录运行：
+
+```bash
+python -m pip install -r data/requirements.txt
+python -m data.scripts.generate_demo --rows 36908
+python -m data.scripts.clean_data --input data/demo/borrow_records_demo.csv --dataset-label simulated
+python -m data.scripts.analyze
+python -m unittest discover -s data/tests -v
+```
+
+清洗、质量报告和统计结果写入 `data/processed/`。输入字段、真实 Excel 导入及前端字段映射见 [数据模块说明](data/README.md) 和 [C1 数据交付约定](docs/c-data-contract.md)。模拟数据和生成结果由本地命令创建。
 
 ---
 
