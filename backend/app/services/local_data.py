@@ -4,12 +4,26 @@ from functools import wraps
 from pathlib import Path
 import json
 import sqlite3
+from threading import Lock
+from data.datasets import prepare_integration
 
 from app.config import settings
 from app.services.provider import DemoProvider, DisabledProvider
 from data.catalog import Catalog
 from data.knowledge import KnowledgeBase
 from data.services import BorrowingData
+
+_integration_lock = Lock()
+
+
+@lru_cache(maxsize=2)
+def _integration_directory(path):
+    with _integration_lock:
+        return prepare_integration(path)
+
+
+def integration_directory():
+    return _integration_directory(settings.INTEGRATION_DATA_DIRECTORY)
 
 
 class DataUnavailable(RuntimeError):
@@ -37,7 +51,7 @@ def _borrowing(captured):
 
 @checked_loader
 def borrowing():
-    directory = Path(settings.DATA_DIRECTORY)
+    directory = integration_directory() if settings.DATA_PROFILE == "integration" else Path(settings.DATA_DIRECTORY)
     paths = [directory / name for name in ("books.csv", "borrow_records.csv", "quality_report.json")]
     before = signature(paths)
     result = _borrowing(before)
@@ -54,7 +68,8 @@ def _catalog(captured):
 
 @checked_loader
 def catalog():
-    return _catalog(signature([Path(settings.CATALOG_DATABASE)]))
+    path = integration_directory()/"catalog.sqlite3" if settings.DATA_PROFILE == "integration" else Path(settings.CATALOG_DATABASE)
+    return _catalog(signature([path]))
 
 
 @lru_cache(maxsize=2)
@@ -73,12 +88,29 @@ def _provider(mode):
 
 
 def provider():
+    if settings.DATA_PROFILE == "integration":
+        return _integration_provider(str(integration_directory()))
     return _provider(settings.OPAC_PROVIDER)
+
+
+@lru_cache(maxsize=2)
+def _integration_provider(directory):
+    from app.services.integration_provider import IntegrationProvider
+    return IntegrationProvider(Path(directory))
+
+
+def search_books_response(query, limit=5):
+    payload = catalog().response(query, limit)
+    if settings.DATA_PROFILE == "integration":
+        for row in payload["data"]:
+            row.update({key:value for key,value in provider().holdings(row["book_key"]).items() if key != "copies"})
+        payload["limitations"] = ["模拟联调库存和架位，非馆方实时状态；以 as_of 固定时点演示。"]
+    return payload
 
 
 @checked_loader
 def usage():
-    path = Path(settings.USAGE_REPORT)
+    path = integration_directory()/"usage.json" if settings.DATA_PROFILE == "integration" else Path(settings.USAGE_REPORT)
     if not path.exists():
         return {"dataset_label": "unknown", "datasets": {}, "is_live": False,
                 "limitations": ["资源使用统计尚未导入。"]}

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Query
 from app.schemas.common import ApiResponse
 from app.schemas.book import Book
 from app.agent.tools.data_client import data_client
-from app.services.local_data import catalog, provider
+from app.services.local_data import catalog, provider, search_books_response
 from app.config import settings
 
 router = APIRouter(prefix="/books", tags=["Books"])
@@ -15,7 +15,7 @@ async def search_books_endpoint(
 ):
     """馆藏图书与架位检索"""
     source = catalog()
-    payload = source.response(query, limit)
+    payload = search_books_response(query, limit)
     label = payload["dataset_label"]
     books = [Book(**{**row, "dataset_label": label}) for row in payload["data"]]
     return ApiResponse.ok(data=books, **{key: payload[key] for key in
@@ -33,5 +33,8 @@ async def get_book_by_isbn(isbn: str):
     source = catalog()
     results = source.lookup_isbn(isbn)
     if results:
-        return ApiResponse.ok(data=Book(**results[0]))
+        row = results[0]
+        if settings.DATA_PROFILE == "integration":
+            row.update({key:value for key,value in provider().holdings(row["book_key"]).items() if key != "copies"})
+        return ApiResponse.ok(data=Book(**row),dataset_label=source.info()["dataset_label"],is_live=False)
     return ApiResponse.fail(code=4004, message="未找到该图书")

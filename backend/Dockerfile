@@ -6,6 +6,7 @@ WORKDIR /app
 # 设置环境变量，防止 Python 缓冲输出
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    INTEGRATION_DATA_DIRECTORY=/app/integration-data \
     DATA_DIRECTORY=/app/data/processed \
     CATALOG_DATABASE=/app/data/processed/catalog.sqlite3 \
     KNOWLEDGE_SOURCE=/app/data/knowledge/rules.json \
@@ -29,6 +30,8 @@ COPY backend/app ./app
 # 只复制标准库运行模块与公开规则摘要，原始数据不进入镜像。
 COPY data/*.py ./data/
 COPY data/knowledge ./data/knowledge/
+COPY data/fixtures/integration ./data/fixtures/integration/
+RUN python -S -c "from data.datasets import prepare_integration; prepare_integration('/app/integration-data')"
 
 # 暴露端口
 EXPOSE 8000

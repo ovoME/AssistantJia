@@ -1,5 +1,7 @@
 # 📑 AssistantJia 前后端 API 接口契约规范 (Draft v1.1)
 
+模拟联调源数据现已提交，真实资料包从团队共享盘获取，见[C模块共享数据指南](c-shared-data.md)。显式DATA_PROFILE=integration提供带模拟标签的库存、日期和编号对照；local真实源缺失字段仍保持未知，身份检查不变。
+
 > **后端框架**：FastAPI  
 > **前端框架**：Vue 3 + Axios + EventSource / fetch ReadableStream  
 > **统一响应规范**：非流式接口统一采用 `{ "code": 0, "message": "success", "data": ... }`

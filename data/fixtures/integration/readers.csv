@@ -1,0 +1,13 @@
+﻿reader_id,name,department,dataset_label
+demo-reader,模拟读者01,模拟院系1,simulated
+demo-peer,模拟读者02,模拟院系2,simulated
+demo-reader-003,模拟读者03,模拟院系3,simulated
+demo-reader-004,模拟读者04,模拟院系1,simulated
+demo-reader-005,模拟读者05,模拟院系2,simulated
+demo-reader-006,模拟读者06,模拟院系3,simulated
+demo-reader-007,模拟读者07,模拟院系1,simulated
+demo-reader-008,模拟读者08,模拟院系2,simulated
+demo-reader-009,模拟读者09,模拟院系3,simulated
+demo-reader-010,模拟读者10,模拟院系1,simulated
+demo-reader-011,模拟读者11,模拟院系2,simulated
+demo-reader-012,模拟读者12,模拟院系3,simulated

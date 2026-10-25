@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "dataset_label": "simulated",
+  "as_of": "2026-09-30T23:00:00+08:00",
+  "book_count": 20,
+  "copy_count": 40,
+  "reader_count": 12,
+  "loan_count": 180,
+  "date_range": [
+    "2026-09-01",
+    "2026-09-30"
+  ],
+  "description": "全部为虚构联调数据；不代表真实读者、书目元数据、日期、架位或库存。",
+  "files": [
+    "books.csv",
+    "borrow_records.csv",
+    "readers.csv",
+    "copies.csv",
+    "holdings.csv",
+    "book_crosswalk.csv",
+    "current_borrows.json",
+    "quality_report.json",
+    "usage.json"
+  ],
+  "example_queries": [
+    "三体",
+    "物流",
+    "Python",
+    "F252.8/11"
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "dataset_label": "real",
+  "archive": "library-real-v1.zip",
+  "sha256": "bf68ab2ac8d5156dc0e1eef324fe3f630e76ccdc01a1d0e78b3516a828c3bcc8",
+  "files": {
+    "books.csv": {
+      "sha256": "eedf60cb28bb268e2a6dfd38b0467a0e7f6486e8a9246ccb20df5a89d5e81197",
+      "bytes": 3304678
+    },
+    "borrow_records.csv": {
+      "sha256": "a4c2ac08903269f0090d8400604391e9755594eadd4b0fd3d23485d829b5a16c",
+      "bytes": 6271970
+    },
+    "quality_report.json": {
+      "sha256": "bd1e4ec23a884ae7c5ce43d8ab13c1957f4ee7a7a92919a05dfdc9dc96b4dd07",
+      "bytes": 1422
+    },
+    "catalog_export.csv": {
+      "sha256": "f18a641c863bf2f9fc9fd4a06b5fb533a967f5a5d70f99d026e108cbf2d7255a",
+      "bytes": 80093506
+    },
+    "usage.json": {
+      "sha256": "00b2d87ce6491d79cbdfa78f20ea32a303fd5027524df5a39e11e6e999e9241c",
+      "bytes": 8685
+    }
+  },
+  "counts": {
+    "borrow_records": 36908,
+    "readers": 3580,
+    "source_book_keys": 22632,
+    "catalog_input_rows": 453233,
+    "catalog_accepted_rows": 453232
+  },
+  "authorization": "用户于2026-10-25要求将提供的借阅/书目数据上传到项目仓库供项目成员联调。",
+  "limitations": [
+    "借阅源没有日期，未补造借阅时间或库存。",
+    "馆藏导出没有可核实的财产号对照，不推断真实编号关联。",
+    "实时状态和架位缺失；读者编号是来源中的脱敏标识，不代表已接入真实身份认证。"
+  ]
+}

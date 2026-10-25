@@ -45,3 +45,4 @@ jobs:
           python -S -W error -m data.scripts.compare_recommendations --phase validation --validation-size 20 --test-size 20 --legacy-size 0 --output data/processed/content_validation.json
           python -S -W error -m data.scripts.build_knowledge
           python -S -W error -m data.scripts.prepare_demo
+          python -S -W error -m data.scripts.prepare_shared --dataset integration
