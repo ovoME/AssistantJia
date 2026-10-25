@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { listDataFiles, uploadDataFile } from '@/api'
 import type { DataFileInfo } from '@/types'
+import { USE_MOCK, mockDataFiles } from '@/mock/data'
 import { useToast } from '@/composables/useToast'
 import CuState from '@/components/cu/CuState.vue'
 
@@ -15,6 +16,9 @@ const error = ref('')
 const dragging = ref(false)
 const uploading = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
+
+const MAX_MB = 50
+const ALLOWED = /\.(xlsx|xls|csv)$/i
 
 const kindLabel: Record<DataFileInfo['kind'], string> = {
   borrow: '借阅流水',
@@ -39,7 +43,11 @@ async function load() {
   try {
     files.value = await listDataFiles()
   } catch (e) {
-    error.value = (e as Error).message || '数据文件列表加载失败'
+    const msg = (e as Error).message || ''
+    // 后端接口未上线时给明确说明，不要把 404 原文抛给用户
+    error.value = /not found|404/i.test(msg)
+      ? '数据管理接口尚未上线，等待后端接入后即可使用。'
+      : (msg || '数据文件列表加载失败')
   } finally {
     loading.value = false
   }
@@ -57,18 +65,34 @@ function onPick(e: Event) {
 }
 
 async function doUpload(file: File) {
+  // 前端只做最基本的拦截，真正的校验必须在后端做
+  if (!ALLOWED.test(file.name)) {
+    toast.error('只支持 .xlsx / .xls / .csv 文件')
+    return
+  }
+  if (file.size > MAX_MB * 1024 * 1024) {
+    toast.error(`文件不能超过 ${MAX_MB}MB`)
+    return
+  }
   uploading.value = true
   try {
     const info = await uploadDataFile(file)
     files.value.unshift(info)
     toast.success(`已接收 ${file.name}`)
-    // mock 模式下 2 秒后把状态从 processing 变成 ready
-    setTimeout(async () => {
-      const idx = files.value.findIndex((f) => f.id === info.id)
-      if (idx >= 0) {
-        files.value[idx] = { ...files.value[idx], status: 'ready', rows: Math.round(2000 + Math.random() * 30000), message: '已入库（演示数据）' }
-      }
-    }, 2000)
+    // 仅演示模式伪造状态流转；真实模式以后端返回为准，前端不得自行改成 ready
+    if (USE_MOCK) {
+      setTimeout(() => {
+        const idx = files.value.findIndex((f) => f.id === info.id)
+        if (idx >= 0) {
+          files.value[idx] = {
+            ...files.value[idx],
+            status: 'ready',
+            rows: mockDataFiles[0].rows,
+            message: '演示数据，未真正入库',
+          }
+        }
+      }, 2000)
+    }
   } catch (e) {
     toast.error((e as Error).message || '上传失败')
   } finally {
@@ -174,9 +198,9 @@ onMounted(load)
         <h4>📌 数据接入说明</h4>
         <ul>
           <li>支持的字段：证件号、索书号、财产号、题名、责任者、ISBN、出版社（与馆方开放数据一致）</li>
-          <li>上传后会自动去重、分类统计，并用于推荐和采购建议</li>
-          <li>借阅流水如果带有借阅日期，趋势图会自动生成</li>
-          <li>文件仅用于本项目演示，不会上传到第三方</li>
+          <li>当前仅保存上传文件并登记清单；自动清洗、统计与推荐重建尚未接入，需管理员另行执行数据准备脚本</li>
+          <li>借阅流水即使带有借阅日期，趋势图目前仍为空（后端尚未实现按日聚合）</li>
+          <li>文件仅保存在本项目服务端，不会上传到第三方</li>
         </ul>
       </div>
     </div>
