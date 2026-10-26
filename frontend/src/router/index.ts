@@ -21,6 +21,12 @@ const router = createRouter({
       component: () => import('@/views/admin/DataManageView.vue'),
       meta: { title: '管理端 · 数据管理' },
     },
+    {
+      path: '/admin/settings',
+      name: 'admin-settings',
+      component: () => import('@/views/admin/SettingsView.vue'),
+      meta: { title: '管理端 · 系统设置' },
+    },
   ],
 })
 

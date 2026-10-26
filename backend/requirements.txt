@@ -13,6 +13,7 @@ uvicorn[standard]>=0.28,<1
 pydantic>=2.6,<3
 pydantic-settings>=2.2,<3
 python-dotenv>=1.0,<2
+python-multipart>=0.0.9,<1
 
 # ---- 大模型调用 ----
 # 配置 LLM_API_KEY 时走 LangChain 真实工具调用；未配置时自动降级为关键词规则引擎

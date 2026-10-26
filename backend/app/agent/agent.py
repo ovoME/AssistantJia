@@ -40,20 +40,13 @@ class LibraryAgent:
     def _prepare(self, message, reader_id):
         q = message.strip()
         quoted = "《" in q
-        if not quoted and any(word in q for word in ["续借", "借期", "多久", "几天", "多少天", "几本", "几册", "多少册", "多少本", "上限", "开馆", "闭馆", "开放", "几点", "座位", "暂离", "积分", "规则", "规定", "预约", "委托", "研讨室", "假期", "充电宝", "校外", "现刊", "工具书", "报纸", "押金", "罚款"]):
-            info = data_client.search_rules_knowledge(q)
-            reply = info["answer"]
-            if info["sources"]:
-                reply += "\n\n来源：\n" + "\n".join(f"[{i}] {row['title']}：{row['url']}" for i, row in enumerate(info["sources"], 1))
-                reply += "\n核对日期：" + info["retrieved_at"][:10] + "。临时安排以馆方公告为准。"
-            return "search_knowledge", {"question": q}, info, [], reply
         if any(word in q for word in ["推荐", "好书", "看什么", "榜单", "热门"]):
             service = local_data.borrowing()
             rows = data_client.get_recommendations(reader_id)
             cards = [recommendation_card(row, service.engine.dataset_label) for row in rows]
             reply = "这是根据历史借阅样本生成的" + ("个性化" if reader_id else "热门") + "推荐；可借状态和架位尚未核实。" if cards else "该筛选条件下没有剩余推荐候选。"
             return "recommend_books", {"limit": 5}, {"recommendations": rows, **service.metadata()}, cards, reply
-        if quoted or any(word in q for word in ["找", "查书", "搜书", "馆藏", "索书号", "架位", "书架", "几楼"]):
+        if quoted or any(word in q for word in ["找书", "查书", "搜书", "馆藏", "索书号", "架位", "书架", "几楼"]):
             query = search_query(q)
             payload = local_data.search_books_response(query, 5)
             cards = [{**row, "dataset_label": payload["dataset_label"], "reservation_supported": row.get("reservation_supported", False)} for row in payload["data"]]
@@ -61,6 +54,13 @@ class LibraryAgent:
             if cards and settings.DATA_PROFILE == "integration":
                 reply = "找到以下模拟联调图书。卡片架位、可借数量和状态均为模拟数据，非馆方实时结果。"
             return "search_books", {"query": query}, payload, cards, reply
+        if not quoted and any(word in q for word in ["续借", "借期", "多久", "几天", "多少天", "几本", "几册", "多少册", "多少本", "上限", "开馆", "闭馆", "开放", "几点", "座位", "暂离", "积分", "规则", "规定", "预约", "委托", "研讨室", "假期", "充电宝", "校外", "现刊", "工具书", "报纸", "押金", "罚款"]):
+            info = data_client.search_rules_knowledge(q)
+            reply = info["answer"]
+            if info["sources"]:
+                reply += "\n\n来源：\n" + "\n".join(f"[{i}] {row['title']}：{row['url']}" for i, row in enumerate(info["sources"], 1))
+                reply += "\n核对日期：" + info["retrieved_at"][:10] + "。临时安排以馆方公告为准。"
+            return "search_knowledge", {"question": q}, info, [], reply
         return None, {}, {}, [], "我是小嘉，可以查询本地书目、推荐图书，以及根据馆方资料回答借阅规则。实时借阅操作请在馆方系统办理。"
 
     async def stream_chat(self, message, session_id="default", reader_id=None):
