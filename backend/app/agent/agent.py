@@ -54,7 +54,7 @@ class LibraryAgent:
             if cards and settings.DATA_PROFILE == "integration":
                 reply = "找到以下模拟联调图书。卡片架位、可借数量和状态均为模拟数据，非馆方实时结果。"
             return "search_books", {"query": query}, payload, cards, reply
-        if not quoted and any(word in q for word in ["续借", "借期", "多久", "几天", "多少天", "上限", "开馆", "闭馆", "开放", "几点", "座位", "暂离", "积分", "规则", "规定", "预约", "委托", "研讨室", "假期", "充电宝", "校外", "现刊", "工具书", "报纸", "押金", "罚款"]):
+        if not quoted and any(word in q for word in ["续借", "借期", "多久", "几天", "多少天", "几本", "几册", "多少册", "多少本", "上限", "开馆", "闭馆", "开放", "几点", "座位", "暂离", "积分", "规则", "规定", "预约", "委托", "研讨室", "假期", "充电宝", "校外", "现刊", "工具书", "报纸", "押金", "罚款"]):
             info = data_client.search_rules_knowledge(q)
             reply = info["answer"]
             if info["sources"]:

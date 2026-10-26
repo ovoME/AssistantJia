@@ -88,17 +88,42 @@ def list_data_files():
 
 @router.post("/data/upload", response_model=ApiResponse[dict])
 async def upload_data_file(file: UploadFile = File(...)):
-    """上传数据文件到 data/raw/"""
-    DATA_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    dest = DATA_UPLOAD_DIR / file.filename
-    content = await file.read()
-    dest.write_bytes(content)
+    """上传数据文件到 data/uploads/"""
+    from fastapi import HTTPException
+    ALLOWED_SUFFIX = {".xlsx", ".xls", ".csv"}
+    MAX_BYTES = 50 * 1024 * 1024
+    UPLOAD_DIR = PROJECT_ROOT / "data" / "uploads"
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+    # 1) 只取 basename，任何目录成分都丢掉
+    name = Path(file.filename or "").name
+    if not name or name in {".", ".."} or Path(name).suffix.lower() not in ALLOWED_SUFFIX:
+        raise HTTPException(400, "仅支持 .xlsx / .xls / .csv 文件")
+
+    dest = UPLOAD_DIR / name
+
+    # 2) 分块读，超限立即中止并清理
+    total = 0
+    with dest.open("wb") as out:
+        while chunk := await file.read(1024 * 1024):
+            total += len(chunk)
+            if total > MAX_BYTES:
+                out.close()
+                dest.unlink(missing_ok=True)
+                raise HTTPException(413, "文件不能超过 50MB")
+            out.write(chunk)
+
+    # 3) 兜底：确认最终路径确实落在目标目录内
+    if not dest.resolve().is_relative_to(UPLOAD_DIR.resolve()):
+        dest.unlink(missing_ok=True)
+        raise HTTPException(400, "非法文件名")
+
     return ApiResponse.ok(data={
         "id": dest.stem,
         "filename": dest.name,
         "kind": "borrow" if "借阅" in dest.name else "other",
         "rows": None,
-        "size_kb": round(len(content) / 1024, 1),
+        "size_kb": round(total / 1024, 1),
         "status": "processing",
         "uploaded_at": datetime.now().isoformat(),
         "message": "文件已上传，需运行数据处理脚本后生效",
@@ -110,7 +135,7 @@ def get_llm_config():
     """获取当前 LLM 配置（API key 脱敏）"""
     from app.config import settings
     key = settings.LLM_API_KEY or ""
-    masked = (key[:6] + "****" + key[-4:]) if len(key) > 12 else (key if key else "未配置")
+    masked = f"{key[:4]}****{key[-4:]}" if len(key) >= 16 else ("****" if key else "未配置")
     return ApiResponse.ok(data={
         "api_key": masked,
         "base_url": settings.LLM_BASE_URL,
@@ -124,7 +149,6 @@ def get_llm_config():
 def update_llm_config(payload: dict):
     """更新 LLM 配置（写入 .env）"""
     from app.config import settings
-    import os
     # 更新运行时配置
     if "api_key" in payload and payload["api_key"] and "****" not in payload["api_key"]:
         settings.LLM_API_KEY = payload["api_key"]
