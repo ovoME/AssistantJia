@@ -13,7 +13,8 @@ router = APIRouter(prefix="/admin", tags=["Admin & Analytics"], dependencies=[De
 
 from app.config import PROJECT_ROOT
 
-DATA_UPLOAD_DIR = PROJECT_ROOT / "data" / "raw"
+# 用户上传物独立存放；data/raw 是主办方原始数据目录，保持只读
+DATA_UPLOAD_DIR = PROJECT_ROOT / "data" / "uploads"
 
 
 @router.get("/stats/summary", response_model=ApiResponse[AdminSummary])
@@ -67,7 +68,7 @@ def generate_book_review(req: BookReviewRequest):
 
 @router.get("/data/files", response_model=ApiResponse[List[dict]])
 def list_data_files():
-    """列出已上传到 data/raw 的数据文件"""
+    """列出已上传到 data/uploads 的数据文件"""
     DATA_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     files = []
     for p in DATA_UPLOAD_DIR.iterdir():
@@ -92,15 +93,15 @@ async def upload_data_file(file: UploadFile = File(...)):
     from fastapi import HTTPException
     ALLOWED_SUFFIX = {".xlsx", ".xls", ".csv"}
     MAX_BYTES = 50 * 1024 * 1024
-    UPLOAD_DIR = PROJECT_ROOT / "data" / "uploads"
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    # 复用模块级目录，避免上传与列表指向不同位置
+    DATA_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
     # 1) 只取 basename，任何目录成分都丢掉
     name = Path(file.filename or "").name
     if not name or name in {".", ".."} or Path(name).suffix.lower() not in ALLOWED_SUFFIX:
         raise HTTPException(400, "仅支持 .xlsx / .xls / .csv 文件")
 
-    dest = UPLOAD_DIR / name
+    dest = DATA_UPLOAD_DIR / name
 
     # 2) 分块读，超限立即中止并清理
     total = 0
@@ -114,7 +115,7 @@ async def upload_data_file(file: UploadFile = File(...)):
             out.write(chunk)
 
     # 3) 兜底：确认最终路径确实落在目标目录内
-    if not dest.resolve().is_relative_to(UPLOAD_DIR.resolve()):
+    if not dest.resolve().is_relative_to(DATA_UPLOAD_DIR.resolve()):
         dest.unlink(missing_ok=True)
         raise HTTPException(400, "非法文件名")
 
