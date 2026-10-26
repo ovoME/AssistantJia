@@ -86,9 +86,9 @@ onBeforeUnmount(() => {
 /* 鼠标位置的极淡高光 */
 .cursor {
   position: fixed;
-  width: 420px; height: 420px;
+  width: 200px; height: 200px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.55), transparent 62%);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.25), transparent 60%);
   transform: translate(-50%, -50%);
   opacity: 0;
   transition: opacity 0.6s;
