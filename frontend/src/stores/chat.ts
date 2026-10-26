@@ -121,6 +121,7 @@ export const useChatStore = defineStore('chat', () => {
           assistant.content += `${assistant.content ? '\n' : ''}（出错了：${e.message}）`
           break
         case 'done':
+          assistant.thought = ''
           break
       }
     }

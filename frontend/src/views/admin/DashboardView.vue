@@ -70,7 +70,8 @@ async function loadData() {
 function renderCharts() {
   if (hotChartRef.value) {
     hotChart = echarts.init(hotChartRef.value)
-    const names = hotBooks.value.map((b) => b.title.slice(0, 12))
+    const cleanTitle = (t: string) => t.replace(/^[《\[]+|[》\]]+$/g, '').slice(0, 12)
+    const names = hotBooks.value.map((b) => cleanTitle(b.title))
     const counts = hotBooks.value.map((b) => b.count)
     hotChart.setOption({
       grid: { left: 10, right: 36, top: 16, bottom: 10, containLabel: true },
@@ -110,8 +111,25 @@ function renderCharts() {
   if (pieChartRef.value) {
     pieChart = echarts.init(pieChartRef.value)
     const totalCats = categories.value.reduce((s, c) => s + c.count, 0)
+    // 只显示前 10 大类，其余合并为"其他"
+    const sorted = [...categories.value].sort((a, b) => b.count - a.count)
+    const top = sorted.slice(0, 10)
+    const rest = sorted.slice(10)
+    const restSum = rest.reduce((s, c) => s + c.count, 0)
+    const pieData = top.map((c, i) => ({
+      name: c.category_name || c.category,
+      value: c.count,
+      itemStyle: { color: palette[i % palette.length], borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+    }))
+    if (restSum > 0) {
+      pieData.push({
+        name: '其他',
+        value: restSum,
+        itemStyle: { color: '#c2ccd2', borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+      })
+    }
     pieChart.setOption({
-      legend: { bottom: 0, icon: 'circle', textStyle: { color: '#42545e', fontSize: 11 } },
+      legend: { bottom: 0, icon: 'circle', textStyle: { color: '#42545e', fontSize: 11 }, type: 'scroll' },
       title: {
         text: totalCats.toLocaleString(),
         subtext: '总借阅',
@@ -126,12 +144,13 @@ function renderCharts() {
           type: 'pie',
           radius: ['48%', '70%'],
           center: ['50%', '44%'],
-          data: categories.value.map((c, i) => ({
-            name: c.category_name || c.category,
-            value: c.count,
-            itemStyle: { color: palette[i % palette.length], borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
-          })),
-          label: { fontSize: 11, color: '#42545e', overflow: 'none', width: 80 },
+          data: pieData,
+          label: {
+            fontSize: 11,
+            color: '#42545e',
+            formatter: (p: any) => (p.percent > 3 ? p.name : ''),
+          },
+          labelLine: { show: true, length: 10, length2: 10 },
         },
       ],
     })
@@ -159,7 +178,8 @@ function renderCharts() {
         {
           type: 'bar',
           data: counts.slice().reverse(),
-          barWidth: '58%',
+          barWidth: '45%',
+          barGap: '30%',
           itemStyle: {
             borderRadius: [0, 8, 8, 0],
             color: {
@@ -383,8 +403,7 @@ onBeforeUnmount(() => {
 
         <div class="lg-panel chart-card">
           <h3>资源使用导出统计（{{ usage.dataset_label === 'real' ? '真实数据' : usage.dataset_label === 'simulated' ? '模拟数据' : '未标明来源' }}）</h3>
-          <p v-if="!Object.keys(usage.datasets).length">尚未导入资源使用统计。</p>
-          <table v-else style="width:100%;text-align:left">
+          <table v-if="Object.keys(usage.datasets).length" style="width:100%;text-align:left">
             <thead><tr><th>来源</th><th>记录数</th><th>表内不同读者</th><th>观察日期范围</th></tr></thead>
             <tbody><tr v-for="(item, key) in usage.datasets" :key="key">
               <td>{{ item.source_file }}</td><td>{{ item.rows.toLocaleString() }}</td>
@@ -483,7 +502,7 @@ onBeforeUnmount(() => {
   gap: 16px;
   margin: 16px 0;
 }
-.chart-card { padding: 18px 18px 12px; }
+.chart-card { padding: 18px 18px 12px; margin-bottom: 16px; }
 .chart-card h3 { font-size: 15px; font-weight: 700; color: var(--ink); margin: 0 0 8px; }
 .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .card-head h3 { margin: 0; }
