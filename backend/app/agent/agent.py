@@ -79,6 +79,25 @@ class LibraryAgent:
                 yield self._format_sse({"type": "tool_call", "tool": tool, "args": args})
             for card in cards:
                 yield self._format_sse({"type": "card", "card_type": "book", "data": card})
+            # 闲聊类问题（tool=None）走 LLM 生成回复
+            if not tool and settings.LLM_API_KEY and not settings.LLM_API_KEY.startswith("sk-your"):
+                try:
+                    from langchain_openai import ChatOpenAI
+                    from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+                    llm = ChatOpenAI(model=settings.LLM_MODEL, api_key=settings.LLM_API_KEY,
+                                     base_url=settings.LLM_BASE_URL, temperature=0.7, timeout=20, max_retries=0)
+                    # 用对话历史构造上下文
+                    msgs = [SystemMessage(content=SYSTEM_PROMPT)]
+                    for h in history[-10:]:
+                        if h["role"] == "user":
+                            msgs.append(HumanMessage(content=h["content"]))
+                        elif h["role"] == "assistant":
+                            msgs.append(AIMessage(content=h["content"]))
+                    result = await llm.ainvoke(msgs)
+                    if isinstance(result.content, str) and result.content.strip():
+                        reply = result.content
+                except Exception:
+                    pass
             # 规则采用可引用的摘要原样输出，避免 LLM 改写数值或遗漏适用条件。
             if tool and tool != "search_knowledge" and settings.LLM_API_KEY and not settings.LLM_API_KEY.startswith("sk-your"):
                 try:
