@@ -9,6 +9,7 @@ from app.agent.prompts import (KNOWLEDGE_SUMMARY_PROMPT, ROUTER_PROMPT, SYSTEM_P
                                TOOL_SUMMARY_PROMPT)
 from app.agent.tools.data_client import data_client
 from app.services import local_data
+from app.services.data_manager import data_manager
 
 SESSION_HISTORIES = OrderedDict()
 
@@ -98,6 +99,15 @@ class LibraryAgent:
             return self._run_search(search_query(q))
         if not quoted and any(word in q for word in ["续借", "借期", "多久", "几天", "多少天", "几本", "几册", "多少册", "多少本", "上限", "开馆", "闭馆", "开放", "几点", "座位", "暂离", "积分", "规则", "规定", "预约", "委托", "研讨室", "假期", "充电宝", "校外", "现刊", "工具书", "报纸", "押金", "罚款"]):
             return self._run_rules(q)
+        multi_answer = data_manager.query_multimodal_knowledge(q)
+        if multi_answer:
+            return (
+                "query_multimodal_data",
+                {"domain": multi_answer["domain"], "query": q},
+                multi_answer,
+                [],
+                multi_answer["reply"],
+            )
         return None, {}, {}, [], "我是小嘉，可以查询本地书目、推荐图书，以及根据馆方资料回答借阅规则。实时借阅操作请在馆方系统办理。"
 
     async def _route_with_llm(self, message, reader_id):
@@ -138,6 +148,9 @@ class LibraryAgent:
 
     async def _compose_reply(self, message, tool, args, payload, fallback, history):
         """每一条用户消息都交给大模型组织语言；模型缺失或调用失败时退回规则原文。"""
+        # 结构化多源摘要是按导入样本计算的，直接回传可避免模型添加未核验的统计结论。
+        if tool == "query_multimodal_data":
+            return fallback
         if not self._llm_ready():
             return fallback
         # 借阅为空（未登录，或确实没借）：直接给确定提示，否则模型会向读者索要借书证号，

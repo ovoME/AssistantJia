@@ -176,6 +176,46 @@ export async function getPurchaseAdvice(): Promise<string> {
   return result.report
 }
 
+
+/* ---------- 多源数据管理 (8大类数据导入与同步) ---------- */
+export interface DataSourceItem {
+  id: string
+  name: string
+  folder_name: string
+  filename: string
+  desc: string
+  icon: string
+  is_imported: boolean
+  row_count: number
+  summary: string
+  imported_at: string | null
+  source_file: string | null
+}
+
+export async function getDataSources(): Promise<DataSourceItem[]> {
+  const res = await http.get<unknown, any>('/admin/data/sources')
+  return res.data || []
+}
+
+export async function uploadDataset(category: string, file: File): Promise<any> {
+  const formData = new FormData()
+  formData.append('file', file)
+  const res = await http.post(`/admin/data/upload/${category}`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+  return (res as any).data
+}
+
+export async function quickSyncDataset(category: string): Promise<any> {
+  const res = await http.post(`/admin/data/quick-sync/${category}`)
+  return (res as any).data
+}
+
+export async function quickSyncAllDatasets(): Promise<any> {
+  const res = await http.post('/admin/data/quick-sync-all')
+  return (res as any).data
+}
+
 /* ---------- 数据管理 ---------- */
 /** 列出已上传的数据文件（契约待后端：GET /api/admin/data/files） */
 export async function listDataFiles(): Promise<DataFileInfo[]> {

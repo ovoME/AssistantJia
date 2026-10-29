@@ -35,3 +35,14 @@ class BookReviewRequest(BaseModel):
     title: str
     author: Optional[str] = None
     isbn: Optional[str] = None
+
+
+class DataFileInfo(BaseModel):
+    id: str
+    filename: str
+    kind: str = "other"  # borrow | catalog | gate | seat | room | other
+    rows: Optional[int] = None
+    size_kb: int = 0
+    status: str = "ready"  # ready | processing | error
+    uploaded_at: str
+    message: Optional[str] = None
