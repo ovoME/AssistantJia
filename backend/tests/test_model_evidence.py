@@ -39,3 +39,53 @@ def test_model_outage_preserves_grounded_local_answer(client, monkeypatch):
     assert '"type": "done"' in response.text
     assert "未核实" in response.text
     assert "test-only-model-outage" not in response.text
+
+
+def test_router_decides_intent_when_keyword_table_misses(client, monkeypatch):
+    """关键词表漏掉的问法（如"在不在馆"）应由模型判定该调哪个工具，而不是落到闲聊瞎答。"""
+    import langchain_openai
+    bound = []
+
+    class RouterModel:
+        def __init__(self, **kwargs):
+            pass
+
+        def bind_tools(self, tools):
+            bound.extend(tools)
+            return self
+
+        async def ainvoke(self, messages):
+            return SimpleNamespace(content="", tool_calls=[
+                {"name": "search_books", "args": {"query": "三体"}, "id": "r1", "type": "tool_call"}
+            ])
+
+    monkeypatch.setattr(langchain_openai, "ChatOpenAI", RouterModel)
+    monkeypatch.setattr(settings, "LLM_API_KEY", "unit-test-no-network-key")
+    response = client.post("/api/chat", json={"message": "三体在不在馆"})
+    assert bound, "路由时必须把只读工具交给模型"
+    assert '"tool": "search_books"' in response.text
+    assert '"type": "done"' in response.text
+
+
+def test_router_never_exposes_write_tools(client, monkeypatch):
+    """续借、预约属写操作，不能被模型自行触发。"""
+    import langchain_openai
+    bound = []
+
+    class RouterModel:
+        def __init__(self, **kwargs):
+            pass
+
+        def bind_tools(self, tools):
+            bound.extend(tools)
+            return self
+
+        async def ainvoke(self, messages):
+            return SimpleNamespace(content="", tool_calls=[])
+
+    monkeypatch.setattr(langchain_openai, "ChatOpenAI", RouterModel)
+    monkeypatch.setattr(settings, "LLM_API_KEY", "unit-test-no-network-key")
+    client.post("/api/chat", json={"message": "三体在不在馆"})
+    names = {getattr(tool, "name", "") for tool in bound}
+    assert "search_books" in names
+    assert "renew_book" not in names and "reserve_book" not in names

@@ -14,8 +14,18 @@ ALL_TOOLS = [
     search_knowledge,
 ]
 
+# 交给模型自主选择时只开放只读工具：续借、预约属于写操作，
+# 在 OPAC 未接入真实业务系统的前提下不能由模型自行触发。
+READ_TOOLS = [
+    search_books,
+    recommend_books,
+    search_knowledge,
+    get_user_borrows,
+]
+
 __all__ = [
     "ALL_TOOLS",
+    "READ_TOOLS",
     "search_books",
     "renew_book",
     "reserve_book",
