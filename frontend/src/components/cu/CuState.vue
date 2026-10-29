@@ -34,14 +34,21 @@ defineEmits<{ retry: [] }>()
 
 <style scoped>
 .cu-state {
-  padding: 40px 16px;
+  padding: 40px 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 14px;
   text-align: center;
-  color: var(--ink-3);
+}
+.cu-state.error {
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(255, 159, 10, 0.35);
+  border-radius: 20px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
+  max-width: 480px;
+  margin: 30px auto;
 }
 .state-line {
   display: flex;
@@ -49,13 +56,14 @@ defineEmits<{ retry: [] }>()
   gap: 10px;
 }
 .state-icon {
-  font-size: 36px;
+  font-size: 40px;
   line-height: 1;
-  opacity: 0.85;
 }
 .state-text {
-  font-size: 14px;
-  line-height: 1.7;
-  max-width: 360px;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.6;
+  max-width: 380px;
+  color: #16262e;
 }
 </style>

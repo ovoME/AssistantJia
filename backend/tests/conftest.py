@@ -9,6 +9,9 @@ sys.path.insert(0, str(ROOT / "backend"))
 
 from app.config import settings
 from app.services import local_data
+import app.services.data_manager as data_manager_module
+import app.api.data_management as data_management_module
+from app.services.data_manager import data_manager
 from data.scripts.prepare_demo import prepare
 
 
@@ -27,6 +30,13 @@ def fixture_data(monkeypatch):
         monkeypatch.setattr(settings, "READER_TOKEN_SECRET", "unit-test-reader-secret-at-least-32-characters")
         monkeypatch.setattr(settings, "LLM_API_KEY", None)
         monkeypatch.setattr(settings, "USAGE_REPORT", str(directory / "usage.json"))
+        imported_directory = directory / "imported"
+        imported_directory.mkdir()
+        monkeypatch.setattr(data_manager_module, "IMPORTED_DIR", imported_directory)
+        monkeypatch.setattr(data_management_module, "IMPORTED_DIR", imported_directory)
+        monkeypatch.setattr(data_manager, "manifest_file", imported_directory / "data_manifest.json")
+        monkeypatch.setattr(data_manager, "manifest", {})
+        monkeypatch.setattr(settings, "DATA_SOURCE_DIRECTORY", str(directory / "raw"))
         local_data._provider.cache_clear()
         yield directory
         local_data._catalog.cache_clear()

@@ -66,6 +66,8 @@ data/processed/*
 !data/processed/.gitkeep
 data/demo/*
 !data/demo/.gitkeep
+data/imported/*
+!data/imported/.gitkeep
 # 真实数据包不入库：从团队共享盘获取后放到 data/shared/
 data/shared/*.zip
 *.xlsx

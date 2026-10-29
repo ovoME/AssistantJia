@@ -7,6 +7,7 @@ from app.api.recommend import router as recommend_router
 from app.api.admin import router as admin_router
 from app.api.knowledge import router as knowledge_router
 from app.api.data_status import router as data_status_router
+from app.api.data_management import router as data_management_router
 
 api_router = APIRouter()
 
@@ -18,5 +19,6 @@ api_router.include_router(recommend_router)
 api_router.include_router(admin_router)
 api_router.include_router(knowledge_router)
 api_router.include_router(data_status_router)
+api_router.include_router(data_management_router)
 
 __all__ = ["api_router"]

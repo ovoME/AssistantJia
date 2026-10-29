@@ -15,6 +15,7 @@ services:
       - DATA_PROFILE=${DATA_PROFILE:-local}
       - INTEGRATION_DATA_DIRECTORY=/app/integration-data
       - DATA_DIRECTORY=${DATA_DIRECTORY:-/app/data/processed/service-demo}
+      - DATA_SOURCE_DIRECTORY=${DATA_SOURCE_DIRECTORY:-/app/data/raw}
       - CATALOG_DATABASE=${CATALOG_DATABASE:-/app/data/processed/service-demo/catalog.sqlite3}
       - KNOWLEDGE_SOURCE=${KNOWLEDGE_SOURCE:-/app/data/knowledge/rules.json}
       - USAGE_REPORT=${USAGE_REPORT:-/app/data/processed/usage.json}
@@ -22,6 +23,8 @@ services:
       - .env
     volumes:
       - ./data/processed:/app/data/processed:ro
+      - ./data/raw:/app/data/raw:ro
+      - ./data/imported:/app/data/imported
     depends_on:
       redis:
         condition: service_healthy

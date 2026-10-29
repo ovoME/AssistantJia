@@ -1,21 +1,14 @@
 from typing import List
-from fastapi import APIRouter, Depends, Query, UploadFile, File
+from fastapi import APIRouter, Depends, Query
 from app.auth import require_admin
 from app.schemas.common import ApiResponse
 from app.schemas.admin import AdminSummary, CategoryStat, BookStat, PublisherStat, PurchaseAdviceRequest, BookReviewRequest
 from app.services.local_data import borrowing, usage
-from pathlib import Path
-import json
-from datetime import datetime
 
 router = APIRouter(prefix="/admin", tags=["Admin & Analytics"], dependencies=[Depends(require_admin)])
 
 
 from app.config import PROJECT_ROOT
-
-# 用户上传物独立存放；data/raw 是主办方原始数据目录，保持只读
-DATA_UPLOAD_DIR = PROJECT_ROOT / "data" / "uploads"
-
 
 @router.get("/stats/summary", response_model=ApiResponse[AdminSummary])
 def get_summary_stats():
@@ -64,71 +57,6 @@ def generate_purchase_advice(req: PurchaseAdviceRequest = PurchaseAdviceRequest(
 @router.post("/book-review", response_model=ApiResponse)
 def generate_book_review(req: BookReviewRequest):
     return ApiResponse.fail(code=4002, message="尚无可核实的书评来源，请查看馆方推荐或图书介绍。")
-
-
-@router.get("/data/files", response_model=ApiResponse[List[dict]])
-def list_data_files():
-    """列出已上传到 data/uploads 的数据文件"""
-    DATA_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    files = []
-    for p in DATA_UPLOAD_DIR.iterdir():
-        if p.is_file() and p.suffix in (".xlsx", ".xls", ".csv"):
-            stat = p.stat()
-            files.append({
-                "id": p.stem,
-                "filename": p.name,
-                "kind": "borrow" if "借阅" in p.name else "other",
-                "rows": None,
-                "size_kb": round(stat.st_size / 1024, 1),
-                "status": "ready",
-                "uploaded_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-            })
-    files.sort(key=lambda x: x["uploaded_at"], reverse=True)
-    return ApiResponse.ok(data=files)
-
-
-@router.post("/data/upload", response_model=ApiResponse[dict])
-async def upload_data_file(file: UploadFile = File(...)):
-    """上传数据文件到 data/uploads/"""
-    from fastapi import HTTPException
-    ALLOWED_SUFFIX = {".xlsx", ".xls", ".csv"}
-    MAX_BYTES = 50 * 1024 * 1024
-    # 复用模块级目录，避免上传与列表指向不同位置
-    DATA_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
-    # 1) 只取 basename，任何目录成分都丢掉
-    name = Path(file.filename or "").name
-    if not name or name in {".", ".."} or Path(name).suffix.lower() not in ALLOWED_SUFFIX:
-        raise HTTPException(400, "仅支持 .xlsx / .xls / .csv 文件")
-
-    dest = DATA_UPLOAD_DIR / name
-
-    # 2) 分块读，超限立即中止并清理
-    total = 0
-    with dest.open("wb") as out:
-        while chunk := await file.read(1024 * 1024):
-            total += len(chunk)
-            if total > MAX_BYTES:
-                out.close()
-                dest.unlink(missing_ok=True)
-                raise HTTPException(413, "文件不能超过 50MB")
-            out.write(chunk)
-
-    # 3) 兜底：确认最终路径确实落在目标目录内
-    if not dest.resolve().is_relative_to(DATA_UPLOAD_DIR.resolve()):
-        dest.unlink(missing_ok=True)
-        raise HTTPException(400, "非法文件名")
-
-    return ApiResponse.ok(data={
-        "id": dest.stem,
-        "filename": dest.name,
-        "kind": "borrow" if "借阅" in dest.name else "other",
-        "rows": None,
-        "size_kb": round(total / 1024, 1),
-        "status": "processing",
-        "uploaded_at": datetime.now().isoformat(),
-        "message": "文件已上传，需运行数据处理脚本后生效",
-    })
 
 
 @router.get("/config/llm", response_model=ApiResponse[dict])
