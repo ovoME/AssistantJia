@@ -24,7 +24,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .github/tests/deploy-smoke
-          file: Dockerfile
+          file: .github/tests/deploy-smoke/Dockerfile
           push: false
           tags: local/assistantjia-smoke:ci
       - name: Test GHCR login with read-only workflow token
