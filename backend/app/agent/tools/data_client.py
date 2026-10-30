@@ -25,10 +25,10 @@ class DataClient:
         return local_data.provider().reserve(reader_id, isbn)
 
     @staticmethod
-    def get_recommendations(reader_id=None, limit=5, query=None, session_id=None):
+    def get_recommendations(reader_id=None, limit=5, query=None, session_id=None, popular=None):
         if reader_id:
             ensure_reader(reader_id)
-        return discover(local_data.borrowing().engine, reader_id, limit, query, session_id)
+        return discover(local_data.borrowing().engine, reader_id, limit, query, session_id, popular)
 
     @staticmethod
     def get_hot_books(category=None, limit=10):

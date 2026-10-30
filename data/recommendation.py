@@ -63,13 +63,19 @@ def recommendation_topic(query: str | None) -> str:
     return topic
 
 
-def wants_popular(query: str | None) -> bool:
-    """仅在读者明确要求热门时使用历史热度；书名内出现“热门”不算。"""
+def excludes_popular(query: str | None) -> bool:
+    """识别对热门推荐的明确否定，防止语义路由反转用户意图。"""
     if not isinstance(query, str):
         return False
     text = re.sub(r"《[^》]*》", "", _text(query))
-    if re.search(r"(?:不要|不想|别|不用)(?:再|看|要|推荐|只看)?(?:热门|人气|受欢迎|热借|热榜)", text):
+    return bool(re.search(r"(?:不要|不想|别|不用)(?:再|看|要|推荐|只看)?(?:热门|人气|受欢迎|热借|热榜)", text))
+
+
+def wants_popular(query: str | None) -> bool:
+    """仅在读者明确要求热门时使用历史热度；书名内出现“热门”不算。"""
+    if not isinstance(query, str) or excludes_popular(query):
         return False
+    text = re.sub(r"《[^》]*》", "", _text(query))
     return bool(re.search(r"热门|人气|受欢迎|热借|热榜", text))
 
 
@@ -296,13 +302,16 @@ class Recommender:
                 for score, key, reason, method in ranked[:limit]]
 
     def discover(self, reader_id: str | None = None, limit: int = 5, query: str | None = None,
-                 avoid: Iterable[str] = (), rng=None, category: str | None = None) -> list[dict]:
+                 avoid: Iterable[str] = (), rng=None, category: str | None = None,
+                 popular: bool | None = None) -> list[dict]:
         """依据问题和可用的个人兴趣抽取多样候选；不使用借阅次数排序。"""
         limit, category = _limit(limit), _category(category)
         if reader_id is not None and not isinstance(reader_id, str):
             raise ValueError("reader_id 必须为文本，以保留前导零。")
+        if popular is not None and not isinstance(popular, bool):
+            raise ValueError("popular 必须为布尔值。")
         topic = recommendation_topic(query)
-        popular = wants_popular(query)
+        popular = wants_popular(query) if popular is None else popular
         history = self._histories.get(_text(reader_id or ""), set())
         candidates = self._candidates(category, history)
         if topic:

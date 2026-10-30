@@ -119,13 +119,22 @@ def test_model_cannot_invent_books_when_no_topic_matches(client, integration, mo
 
     class InventingModel:
         def __init__(self, **kwargs):
-            calls.append(True)
+            self.router = False
+
+        def bind_tools(self, tools):
+            self.router = True
+            return self
 
         async def ainvoke(self, messages):
+            calls.append("router" if self.router else "compose")
+            if self.router:
+                return SimpleNamespace(content="", tool_calls=[
+                    {"name": "recommend_books", "args": {"query": "不存在的xyz主题"}}
+                ])
             return SimpleNamespace(content="我给你推荐一本虚构的书。")
 
     monkeypatch.setattr(langchain_openai, "ChatOpenAI", InventingModel)
     monkeypatch.setattr(settings, "LLM_API_KEY", "unit-test-only")
     rows, text = cards(client.post("/api/chat", json={"message": "推荐不存在的xyz主题的书"}))
     assert not rows and "没有找到" in text
-    assert not calls
+    assert calls == ["router"]

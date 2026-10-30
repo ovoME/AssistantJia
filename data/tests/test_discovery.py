@@ -86,6 +86,7 @@ class DiscoveryTests(unittest.TestCase):
     def test_popular_request_does_not_invent_borrowing_activity(self):
         engine, _, _ = engine_for([book(1), book(2)], [])
         self.assertEqual(engine.discover(query="推荐热门书"), [])
+        self.assertEqual(engine.discover(popular=True), [])
         self.assertEqual(len(engine.discover(query="推荐几本书")), 2)
 
     def test_cli_defaults_to_topic_aware_discovery(self):
@@ -115,7 +116,7 @@ class DiscoveryTests(unittest.TestCase):
         books = [book(1), book(2)]
         engine, _, _ = engine_for(books, [("target", 0), ("target", 1)])
         self.assertEqual(engine.discover("target"), [])
-        for args in ({"limit": 0}, {"reader_id": 1}, {"query": 1}, {"query": "x" * 2001}):
+        for args in ({"limit": 0}, {"reader_id": 1}, {"query": 1}, {"query": "x" * 2001}, {"popular": "yes"}):
             with self.subTest(args=args), self.assertRaises(ValueError):
                 engine.discover(**args)
 
