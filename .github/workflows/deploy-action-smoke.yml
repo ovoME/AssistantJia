@@ -1,0 +1,73 @@
+name: Deploy action smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/deploy.yml'
+      - '.github/workflows/deploy-action-smoke.yml'
+      - '.github/tests/deploy-smoke/**'
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  docker-actions:
+    name: Build without push and read-only registry login
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v3
+      - name: Build a tiny image without publishing
+        uses: docker/build-push-action@v7
+        with:
+          context: .github/tests/deploy-smoke
+          file: Dockerfile
+          push: false
+          tags: local/assistantjia-smoke:ci
+      - name: Test GHCR login with read-only workflow token
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+          logout: true
+
+  ssh-action:
+    name: SSH action against a disposable local host
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Start a loopback-only SSH server with an ephemeral key
+        id: ssh-server
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openssh-server
+          sudo mkdir -p /run/sshd
+          ssh-keygen -q -t ed25519 -N '' -f "$RUNNER_TEMP/ssh-smoke-key"
+          mkdir -p "$HOME/.ssh"
+          cat "$RUNNER_TEMP/ssh-smoke-key.pub" >> "$HOME/.ssh/authorized_keys"
+          chmod 700 "$HOME/.ssh"
+          chmod 600 "$HOME/.ssh/authorized_keys"
+          sudo /usr/sbin/sshd -p 2222
+          while IFS= read -r line; do echo "::add-mask::$line"; done < "$RUNNER_TEMP/ssh-smoke-key"
+          echo "username=$(id -un)" >> "$GITHUB_OUTPUT"
+          {
+            echo 'private_key<<SSHKEY'
+            cat "$RUNNER_TEMP/ssh-smoke-key"
+            echo 'SSHKEY'
+          } >> "$GITHUB_OUTPUT"
+      - name: Run a harmless command over SSH
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: 127.0.0.1
+          port: 2222
+          username: ${{ steps.ssh-server.outputs.username }}
+          key: ${{ steps.ssh-server.outputs.private_key }}
+          script: echo ssh-action-smoke-ok > /tmp/assistantjia-ssh-smoke.txt
+      - name: Verify the remote command ran
+        run: test "$(cat /tmp/assistantjia-ssh-smoke.txt)" = 'ssh-action-smoke-ok'
