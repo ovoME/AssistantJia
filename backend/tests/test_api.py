@@ -1,0 +1,103 @@
+import time
+from app.auth import sign_reader_token
+from app.config import settings
+
+
+def test_health(client):
+    assert client.get('/health').json()['data']['status'] == 'healthy'
+
+
+def test_api_books_search(client):
+    response = client.get('/api/books/search', params={'query':'Python'})
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body['data']) == 2
+    assert body['dataset_label'] == 'simulated'
+    assert body['is_live'] is False
+    assert all(row['available'] is None and row['location'] is None for row in body['data'])
+
+
+def test_api_reader_borrows(client):
+    body = client.get('/api/reader/demo-reader/borrows').json()
+    assert body['dataset_label'] == 'simulated'
+    assert body['data'][0]['book_id'] == 'DEMO-COPY-001'
+    assert body['data'][0]['is_live'] is False
+
+
+def test_api_admin_stats(client):
+    assert client.get('/api/admin/stats/summary').status_code == 401
+    response = client.get('/api/admin/stats/summary', headers={'X-Admin-Token':settings.ADMIN_TOKEN})
+    assert response.status_code == 200
+    data = response.json()['data']
+    assert data['total_borrows'] == 8
+    assert data['total_readers'] == 3
+    assert data['total_titles'] == 6
+
+
+def test_recommend_uses_verified_identity(client):
+    assert client.get('/api/recommend?reader_id=demo-reader').status_code == 401
+    token = sign_reader_token('demo-reader', settings.READER_TOKEN_SECRET, time.time()+3600)
+    response = client.get('/api/recommend', headers={'Authorization':'Bearer '+token})
+    assert response.status_code == 200
+    from data.scripts.generate_demo import demo_isbn
+    keys = {row['book_key'] for row in response.json()['data']}
+    assert not keys & {'isbn:'+demo_isbn(1), 'isbn:'+demo_isbn(3)}
+    assert client.get('/api/recommend?reader_id=someone-else', headers={'Authorization':'Bearer '+token}).status_code == 403
+
+
+def test_api_book_review(client):
+    headers = {'X-Admin-Token': settings.ADMIN_TOKEN}
+    res_empty = client.post('/api/admin/book-review', json={'title': ''}, headers=headers)
+    assert res_empty.status_code == 200
+    assert res_empty.json()['code'] == 4002
+
+    res = client.post('/api/admin/book-review', json={'title': '三体', 'author': '刘慈欣'}, headers=headers)
+    assert res.status_code == 200
+    assert res.json()['code'] == 4002
+    assert '尚无可核实的书评来源' in res.json()['message']
+
+
+def test_api_data_management_sources(client):
+    assert client.get('/api/admin/data/sources').status_code == 401
+    res = client.get('/api/admin/data/sources', headers={'X-Admin-Token': settings.ADMIN_TOKEN})
+    assert res.status_code == 200
+    data = res.json()['data']
+    assert len(data) == 8
+    names = [item['name'] for item in data]
+    assert '备考联盟数据' in names
+    assert '学者库数据' in names
+    assert '座位系统数据' in names
+
+
+def test_api_data_management_files(client):
+    assert client.get('/api/admin/data/files').status_code == 401
+    res = client.get('/api/admin/data/files', headers={'X-Admin-Token': settings.ADMIN_TOKEN})
+    assert res.status_code == 200
+    data = res.json()['data']
+    assert isinstance(data, list)
+    if data:
+        first = data[0]
+        assert 'id' in first
+        assert 'filename' in first
+        assert 'kind' in first
+        assert 'status' in first
+        assert 'size_kb' in first
+
+
+def test_api_data_management_upload_general(client):
+    csv_content = "证件号,读者姓名,院系\n2022001,测试读者,信息科学与技术学院\n"
+    files = {"file": ("读者测试数据.csv", csv_content.encode("utf-8"), "text/csv")}
+    assert client.post('/api/admin/data/upload', files=files).status_code == 401
+    files = {"file": ("读者测试数据.csv", csv_content.encode("utf-8"), "text/csv")}
+    res = client.post(
+        '/api/admin/data/upload',
+        files=files,
+        headers={'X-Admin-Token': settings.ADMIN_TOKEN},
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body['code'] == 0
+    data = body['data']
+    assert data['kind'] == 'catalog'
+    assert data['status'] == 'ready'
+    assert data['filename'] == '读者测试数据.csv'

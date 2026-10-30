@@ -1,0 +1,51 @@
+{
+  "dataset_label": "simulated",
+  "is_live": false,
+  "datasets": {
+    "seats": {
+      "source_file": "模拟座位预约.csv",
+      "rows": 120,
+      "distinct_source_readers": 10,
+      "observed_date_min": "2026-09-01",
+      "observed_date_max": "2026-09-30"
+    },
+    "rooms": {
+      "source_file": "模拟研讨室预约.csv",
+      "rows": 30,
+      "distinct_source_readers": 8,
+      "observed_date_min": "2026-09-01",
+      "observed_date_max": "2026-09-30"
+    },
+    "gate_events": {
+      "source_file": "模拟门禁刷卡.csv",
+      "rows": 300,
+      "distinct_source_readers": 12,
+      "observed_date_min": "2026-09-01",
+      "observed_date_max": "2026-09-30"
+    },
+    "gate_counts": {
+      "source_file": "模拟门禁汇总.csv",
+      "rows": 12,
+      "distinct_source_readers": 12,
+      "observed_date_min": "2026-09-01",
+      "observed_date_max": "2026-09-30"
+    },
+    "readers": {
+      "source_file": "模拟读者.csv",
+      "rows": 12,
+      "distinct_source_readers": 12,
+      "observed_date_min": "2026-09-01",
+      "observed_date_max": "2026-09-30"
+    },
+    "scholars": {
+      "source_file": "模拟学者库.csv",
+      "rows": 20,
+      "distinct_source_readers": null,
+      "observed_date_min": "2026-09-01",
+      "observed_date_max": "2026-09-30"
+    }
+  },
+  "limitations": [
+    "全部为独立虚构的资源统计汇总，仅供联调。"
+  ]
+}

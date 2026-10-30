@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "dataset_label": "real",
+  "archive": "library-sources-v1.zip",
+  "sha256": "fe83828afdcdbd34b3b61fd5103cb86f7c0abfbf3e347ab317b693a9c7cb6879",
+  "files": {
+    "图书借阅数据.xlsx": {
+      "sha256": "856d0443c8b00825ea84df7ba7c3a31d300044e484938bb48d5a52f8d1f06333",
+      "bytes": 2845545
+    },
+    "学者库数据.xlsx": {
+      "sha256": "abfc4048dfcc75884d2d8a740982c1929089e6d88b32420f6f2a4e84e8b04c81",
+      "bytes": 9231490
+    },
+    "座位预约.csv": {
+      "sha256": "0d6458869eb299c228dce3d60684a3e2eeada836adb1ce627d21cc3c85604647",
+      "bytes": 4053142
+    },
+    "研讨室预约.xlsx": {
+      "sha256": "9a6622336a4ffa1f1270cb229d56f223be8c1c797a99d519a65479321d43f6bb",
+      "bytes": 622069
+    },
+    "读者数据.csv": {
+      "sha256": "5808843323004c6df2928240c30abb5b67534942ef7e055e2efa0fece5ce2b4d",
+      "bytes": 2662495
+    },
+    "门禁入馆人次.xlsx": {
+      "sha256": "efbf69f326a3a16416fc59dd07b2a188eee55f89ed42dacc617e24347dfd5488",
+      "bytes": 1035718
+    },
+    "门禁刷卡.xlsx": {
+      "sha256": "62f6469dca2b6f54e8ddfedec12d6a9c3efd29cafa845589da039dd0c6e722e7",
+      "bytes": 6096496
+    }
+  },
+  "authorization": "用户于2026-10-25明确要求将提供的文件上传至本项目，供项目成员开发和测试。",
+  "note": "图书数据.csv 的完整原始内容在 library-real-v1.zip 的 catalog_export.csv 中，避免重复存储。原表未补造日期、架位或关联。"
+}

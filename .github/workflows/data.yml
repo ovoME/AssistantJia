@@ -1,0 +1,48 @@
+name: Data C1 and C2
+
+on:
+  push:
+    branches: [main, develop]
+    paths: ["data/**", "docs/c-*.md", "docs/c2-*.md", ".github/workflows/data.yml"]
+  pull_request:
+    branches: [main, develop]
+    paths: ["data/**", "docs/c-*.md", "docs/c2-*.md", ".github/workflows/data.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: data-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  data:
+    name: Data tests (pandas ${{ matrix.pandas }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        pandas: ["2.2.3", "3.1.0"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: data/requirements.txt
+      - name: Install data dependencies
+        run: python -m pip install -r data/requirements.txt "pandas==${{ matrix.pandas }}"
+      - name: Run C1 and C2 tests (warnings are errors)
+        run: python -W error -m unittest discover -s data/tests -v
+      - name: Run simulated C1 to C2 CLI flow
+        run: |
+          python -W error -m data.scripts.generate_demo --rows 800
+          python -W error -m data.scripts.clean_data --input data/demo/borrow_records_demo.csv --dataset-label simulated
+          python -W error -m data.scripts.analyze
+          python -S -W error -m data.scripts.recommend --reader-id 000002 --limit 5 --output data/processed/recommendations.json
+          python -S -W error -m data.scripts.validate_recommendations --limit 5 --holdout-readers 20 --output data/processed/recommendation_validation.json
+          python -S -W error -m data.scripts.compare_recommendations --phase validation --validation-size 20 --test-size 20 --legacy-size 0 --output data/processed/content_validation.json
+          python -S -W error -m data.scripts.build_knowledge
+          python -S -W error -m data.scripts.prepare_demo
+          python -S -W error -m data.scripts.prepare_shared --dataset integration

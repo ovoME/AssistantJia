@@ -1,8 +1,9 @@
 services:
+  # 后端服务 (FastAPI + LangChain Agent)
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: xiaojia-backend
     restart: unless-stopped
     ports:
@@ -11,16 +12,35 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - CHROMA_HOST=chroma
       - CHROMA_PORT=8000
+      - DATA_PROFILE=${DATA_PROFILE:-local}
+      - INTEGRATION_DATA_DIRECTORY=/app/integration-data
+      - DATA_DIRECTORY=${DATA_DIRECTORY:-/app/data/processed/service-demo}
+      - DATA_SOURCE_DIRECTORY=${DATA_SOURCE_DIRECTORY:-/app/data/raw}
+      - CATALOG_DATABASE=${CATALOG_DATABASE:-/app/data/processed/service-demo/catalog.sqlite3}
+      - KNOWLEDGE_SOURCE=${KNOWLEDGE_SOURCE:-/app/data/knowledge/rules.json}
+      - USAGE_REPORT=${USAGE_REPORT:-/app/data/processed/usage.json}
     env_file:
       - .env
     volumes:
-      - ./data:/app/data
+      - ./data/processed:/app/data/processed:ro
+      - ./data/raw:/app/data/raw:ro
+      - ./data/imported:/app/data/imported
     depends_on:
-      - redis
-      - chroma
+      redis:
+        condition: service_healthy
+      chroma:
+        # backend 暂未依赖向量检索就绪，用 service_started 避免 Chroma 拖死主链路
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - xiaojia-net
 
+  # 前端服务 (Vue 3 + Vite 构建产物由 Nginx 托管)
   frontend:
     build:
       context: ./frontend
@@ -30,10 +50,12 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - xiaojia-net
 
+  # 缓存与会话存储
   redis:
     image: redis:7-alpine
     container_name: xiaojia-redis
@@ -42,17 +64,29 @@ services:
       - "6379:6379"
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     networks:
       - xiaojia-net
 
+  # 向量数据库（锁定 0.5.x：1.x 起 /api/v1/heartbeat 已废弃，避免健康检查失配）
   chroma:
-    image: chromadb/chroma:latest
+    image: chromadb/chroma:0.5.23
     container_name: xiaojia-chroma
     restart: unless-stopped
     ports:
       - "8001:8000"
     volumes:
       - chroma-data:/chroma/chroma
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/api/v1/heartbeat', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - xiaojia-net
 
