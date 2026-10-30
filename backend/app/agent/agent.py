@@ -36,13 +36,32 @@ def search_query(message):
     return re.sub(r"(相关的书|相关图书|的书|在哪.*|在几楼.*|有没有.*|可以借吗.*|能借吗.*|[？?。])$", "", text).strip()
 
 
+def recommendation_limit(message):
+    """提取常见的推荐数量，限制在接口允许的范围内。"""
+    match = re.search(r"(\d{1,3}|[一二两三四五六七八九十]{1,3})\s*(?:本|册|部)", message or "")
+    if not match:
+        return 5
+    word = match.group(1)
+    digits = {"一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5,
+              "六": 6, "七": 7, "八": 8, "九": 9}
+    if word.isdecimal():
+        count = int(word)
+    elif "十" in word:
+        left, right = word.split("十", 1)
+        count = digits.get(left, 1 if not left else 0) * 10 + digits.get(right, 0)
+    else:
+        count = digits.get(word, 0)
+    return min(count, 20) if count > 0 else 5
+
+
 class LibraryAgent:
     def _format_sse(self, data):
         return "data: " + json.dumps(data, ensure_ascii=False, allow_nan=False) + "\n\n"
 
     def _run_recommend(self, reader_id, question=None, session_id=None):
         service = local_data.borrowing()
-        rows = data_client.get_recommendations(reader_id, query=question, session_id=session_id)
+        limit = recommendation_limit(question)
+        rows = data_client.get_recommendations(reader_id, limit=limit, query=question, session_id=session_id)
         cards = [recommendation_card(row, service.engine.dataset_label) for row in rows]
         if cards:
             titles = "、".join("《" + row["title"] + "》" for row in rows[:3])
@@ -51,7 +70,7 @@ class LibraryAgent:
             reply = "历史样本中没有找到与该主题直接匹配的推荐，可以换个书名、作者或类别。"
         else:
             reply = "该筛选条件下没有剩余推荐候选。"
-        return "recommend_books", {"limit": 5, "query": question}, {"recommendations": rows, **service.metadata()}, cards, reply
+        return "recommend_books", {"limit": limit, "query": question}, {"recommendations": rows, **service.metadata()}, cards, reply
 
     def _run_search(self, query):
         payload = local_data.search_books_response(query, 5)

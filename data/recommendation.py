@@ -27,7 +27,7 @@ LOAN_FIELDS = {"reader_id", "book_key"}
 # 只剥离常见提问套话；剩余词必须匹配书目信息或明确的中图分类。
 _QUESTION_WORDS = re.compile(
     r"小嘉|能不能|可不可以|有没有|有哪些|有什么|有啥|给我|帮我|为我|麻烦|请问|请|我想看|我想读|想看|想读|我想|想要|我喜欢|喜欢|"
-    r"推荐|介绍|最近|大家|都在|看什么|什么|热门|榜单|好看的|好看|好书|"
+    r"推荐点|来点|一点|推荐|介绍|最近|大家|都在|看什么|什么|热门|榜单|好看的|好看|好书|"
     r"书籍|书本|几本|一本|这本|那本|一些|一批|换一批|再来|关于|有关|相关|方面|"
     r"按我的兴趣|我的兴趣|适合我|适合|看看|吗|呢|吧|一下"
 )
@@ -50,6 +50,8 @@ def recommendation_topic(query: str | None) -> str:
     if quoted:
         return _text(quoted.group(1)).casefold()
     topic = re.sub(r"图书馆(?=(?:里|内|的)?(?:有|推荐|热门))", "", _text(query).casefold())
+    topic = re.sub(r"^你(?:能|可以)?", "", topic)
+    topic = re.sub(r"(?:\d{1,3}|[一二两三四五六七八九十百]+)\s*(?:本|册|部)", "", topic)
     topic = _QUESTION_WORDS.sub("", topic)
     topic = re.sub(r"[^\w\u4e00-\u9fff+#.\-]+", "", topic)
     while True:

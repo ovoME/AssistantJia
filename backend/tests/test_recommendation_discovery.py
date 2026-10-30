@@ -34,9 +34,15 @@ def test_repeated_chat_question_rotates_results_and_reports_actual_titles(client
     assert first_text != second_text
 
 
+@pytest.mark.parametrize("message,expected", [("推荐3本书", 3), ("请推荐十本图书", 10)])
+def test_chat_respects_common_requested_counts(client, integration, message, expected):
+    rows, _ = cards(client.post("/api/chat", json={"message": message}))
+    assert len(rows) == expected
+
+
 def test_topic_flows_through_chat_http_and_tool(client, integration):
     from app.agent.tools.recommend import recommend_books
-    message = "给我推荐几本关于Python的书"
+    message = "给我推荐3本关于Python的书"
     rows, _ = cards(client.post("/api/chat", json={"message": message}))
     assert rows and all("python" in row["title"].lower() for row in rows)
     response = client.get("/api/recommend", params={"query": message})
