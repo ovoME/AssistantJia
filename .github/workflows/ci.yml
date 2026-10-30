@@ -21,7 +21,7 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -48,7 +48,7 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -64,7 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: 构建后端镜像
         run: |
           if [ ! -f backend/Dockerfile ]; then echo "backend/Dockerfile 未合入，跳过"; exit 0; fi
@@ -116,7 +116,7 @@ jobs:
     if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
     needs: [backend, frontend, docker-build]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: 后端Dockerfile未合入则跳过
         if: ${{ hashFiles('backend/Dockerfile') == '' }}
         run: echo "backend/Dockerfile 未合入，跳过集成测试"
