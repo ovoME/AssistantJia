@@ -1,5 +1,6 @@
 """只读接口复用 C1-C4；当前业务只允许显式模拟 provider 或明确未接入。"""
 from app.services import local_data
+from app.services.recommendations import discover
 from app.auth import ensure_reader
 
 
@@ -24,10 +25,10 @@ class DataClient:
         return local_data.provider().reserve(reader_id, isbn)
 
     @staticmethod
-    def get_recommendations(reader_id=None, limit=5):
+    def get_recommendations(reader_id=None, limit=5, query=None, session_id=None):
         if reader_id:
             ensure_reader(reader_id)
-        return local_data.borrowing().engine.recommend(reader_id, limit)
+        return discover(local_data.borrowing().engine, reader_id, limit, query, session_id)
 
     @staticmethod
     def get_hot_books(category=None, limit=10):

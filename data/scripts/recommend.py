@@ -12,13 +12,14 @@ def main():
     parser.add_argument("--data-dir", type=Path, default=Path("data/processed"))
     parser.add_argument("--reader-id", help="仅用于本地测试；服务端应使用已认证身份。")
     parser.add_argument("--category", help="中图大类或字母前缀，如 I、T、TP、UNKNOWN。")
-    parser.add_argument("--strategy", choices=STRATEGIES, default="hybrid")
+    parser.add_argument("--strategy", choices=("discovery", *STRATEGIES), default="discovery")
+    parser.add_argument("--query", help="可选书名、作者或主题；仅 discovery 策略支持。")
     parser.add_argument("--limit", type=int, default=5)
     parser.add_argument("--output", type=Path, help="可选 JSON 文件路径，建议保存在 data/processed/ 内。")
     args = parser.parse_args()
     try:
         engine = Recommender.from_directory(args.data_dir)
-        response = engine.response(args.reader_id, args.limit, args.category, args.strategy)
+        response = engine.response(args.reader_id, args.limit, args.category, args.strategy, args.query)
         encoded = json.dumps(response, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
         if args.output:
             args.output.parent.mkdir(parents=True, exist_ok=True)

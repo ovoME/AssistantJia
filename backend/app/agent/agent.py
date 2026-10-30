@@ -10,6 +10,7 @@ from app.agent.prompts import (KNOWLEDGE_SUMMARY_PROMPT, ROUTER_PROMPT, SYSTEM_P
 from app.agent.tools.data_client import data_client
 from app.services import local_data
 from app.services.data_manager import data_manager
+from data.recommendation import recommendation_topic
 
 SESSION_HISTORIES = OrderedDict()
 
@@ -35,17 +36,41 @@ def search_query(message):
     return re.sub(r"(相关的书|相关图书|的书|在哪.*|在几楼.*|有没有.*|可以借吗.*|能借吗.*|[？?。])$", "", text).strip()
 
 
+def recommendation_limit(message):
+    """提取常见的推荐数量，限制在接口允许的范围内。"""
+    match = re.search(r"(\d{1,3}|[一二两三四五六七八九十]{1,3})\s*(?:本|册|部)", message or "")
+    if not match:
+        return 5
+    word = match.group(1)
+    digits = {"一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5,
+              "六": 6, "七": 7, "八": 8, "九": 9}
+    if word.isdecimal():
+        count = int(word)
+    elif "十" in word:
+        left, right = word.split("十", 1)
+        count = digits.get(left, 1 if not left else 0) * 10 + digits.get(right, 0)
+    else:
+        count = digits.get(word, 0)
+    return min(count, 20) if count > 0 else 5
+
+
 class LibraryAgent:
     def _format_sse(self, data):
         return "data: " + json.dumps(data, ensure_ascii=False, allow_nan=False) + "\n\n"
 
-    def _run_recommend(self, reader_id):
+    def _run_recommend(self, reader_id, question=None, session_id=None):
         service = local_data.borrowing()
-        rows = data_client.get_recommendations(reader_id)
+        limit = recommendation_limit(question)
+        rows = data_client.get_recommendations(reader_id, limit=limit, query=question, session_id=session_id)
         cards = [recommendation_card(row, service.engine.dataset_label) for row in rows]
-        reply = ("这是根据历史借阅样本生成的" + ("个性化" if reader_id else "热门")
-                 + "推荐；可借状态和架位尚未核实。") if cards else "该筛选条件下没有剩余推荐候选。"
-        return "recommend_books", {"limit": 5}, {"recommendations": rows, **service.metadata()}, cards, reply
+        if cards:
+            titles = "、".join("《" + row["title"] + "》" for row in rows[:3])
+            reply = f"可借状态和架位未核实。给你挑了{titles}；推荐来自历史借阅样本。"
+        elif recommendation_topic(question):
+            reply = "历史样本中没有找到与该主题直接匹配的推荐，可以换个书名、作者或类别。"
+        else:
+            reply = "该筛选条件下没有剩余推荐候选。"
+        return "recommend_books", {"limit": limit, "query": question}, {"recommendations": rows, **service.metadata()}, cards, reply
 
     def _run_search(self, query):
         payload = local_data.search_books_response(query, 5)
@@ -76,11 +101,11 @@ class LibraryAgent:
         reply = (f"你当前在借 {count} 本，到期时间在上面的记录里。" if count else "你现在没有在借的书。")
         return "get_user_borrows", {"reader_id": reader_id}, {"borrows": records}, [], reply
 
-    def _execute(self, tool, args, reader_id):
+    def _execute(self, tool, args, reader_id, question=None, session_id=None):
         """按工具名执行只读查询；关键词命中与模型路由共用同一条路径。"""
         args = args or {}
         if tool == "recommend_books":
-            return self._run_recommend(reader_id)
+            return self._run_recommend(reader_id, question or args.get("query"), session_id)
         if tool == "get_user_borrows":
             return self._run_borrows(reader_id)
         if tool == "search_books":
@@ -90,11 +115,11 @@ class LibraryAgent:
             return self._run_rules(args.get("question") or args.get("query") or "")
         return None
 
-    def _prepare(self, message, reader_id):
+    def _prepare(self, message, reader_id, session_id=None):
         q = message.strip()
         quoted = "《" in q
         if any(word in q for word in ["推荐", "好书", "看什么", "榜单", "热门"]):
-            return self._run_recommend(reader_id)
+            return self._run_recommend(reader_id, q, session_id)
         if quoted or any(word in q for word in ["找书", "查书", "搜书", "馆藏", "索书号", "架位", "书架", "几楼"]):
             return self._run_search(search_query(q))
         if not quoted and any(word in q for word in ["续借", "借期", "多久", "几天", "多少天", "几本", "几册", "多少册", "多少本", "上限", "开馆", "闭馆", "开放", "几点", "座位", "暂离", "积分", "规则", "规定", "预约", "委托", "研讨室", "假期", "充电宝", "校外", "现刊", "工具书", "报纸", "押金", "罚款"]):
@@ -157,6 +182,9 @@ class LibraryAgent:
         # 而身份其实来自登录态，报证件号没有用。
         if tool == "get_user_borrows" and not payload.get("borrows"):
             return fallback
+        # 空结果不能由模型补造书目。
+        if tool == "recommend_books" and not payload.get("recommendations"):
+            return fallback
         try:
             from langchain_openai import ChatOpenAI
             from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, ToolMessage
@@ -190,6 +218,9 @@ class LibraryAgent:
             text = result.content if isinstance(result.content, str) else ""
             if not text.strip():
                 return fallback
+            # 泛泛的模型回复会掩盖换批结果；没有提到本批书名时用实际书目生成回复。
+            if tool == "recommend_books" and not any(row["title"] in text for row in payload["recommendations"]):
+                return fallback
             if tool == "search_knowledge":
                 return text.strip() + self._knowledge_suffix(payload)
             if tool == "get_user_borrows":
@@ -206,7 +237,7 @@ class LibraryAgent:
         try:
             degraded = False
             try:
-                tool, args, payload, cards, reply = await asyncio.to_thread(self._prepare, message, reader_id)
+                tool, args, payload, cards, reply = await asyncio.to_thread(self._prepare, message, reader_id, session_id)
             except (OSError, ValueError, PermissionError, RuntimeError):
                 tool, args, payload, cards = None, {}, {}, []
                 reply = "相关数据服务当前未就绪，请稍后重试；需要实时业务请使用馆方系统或咨询总服务台。"
@@ -216,7 +247,7 @@ class LibraryAgent:
                 routed = await self._route_with_llm(message, reader_id)
                 if routed:
                     try:
-                        executed = await asyncio.to_thread(self._execute, routed[0], routed[1], reader_id)
+                        executed = await asyncio.to_thread(self._execute, routed[0], routed[1], reader_id, message, session_id)
                     except (OSError, ValueError, PermissionError, RuntimeError):
                         executed = None
                     if executed:
