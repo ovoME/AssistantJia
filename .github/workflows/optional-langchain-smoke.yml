@@ -1,0 +1,36 @@
+name: Optional LangChain smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/requirements-ml.txt'
+      - 'backend/ci/smoke_langchain.py'
+      - '.github/workflows/optional-langchain-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  langchain-smoke:
+    name: Optional LangChain compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend base and LangChain-only optional dependencies
+        shell: bash
+        run: |
+          python -m pip install -r backend/requirements.txt
+          grep -E '^langchain(-community)?[<>=!~]' backend/requirements-ml.txt > "$RUNNER_TEMP/langchain-requirements.txt"
+          test -s "$RUNNER_TEMP/langchain-requirements.txt"
+          python -m pip install -r "$RUNNER_TEMP/langchain-requirements.txt"
+      - name: Check dependency resolution and import surface
+        run: |
+          python -m pip check
+          python backend/ci/smoke_langchain.py

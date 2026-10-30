@@ -16,7 +16,7 @@ sentence-transformers>=2.6,<4
 
 # ---- LangChain 全量生态（仅在需要 chains / community loaders 时）----
 langchain>=0.2,<2
-langchain-community>=0.2,<2
+langchain-community>=0.4.2,<2
 
 # ---- OpenAI 原生 SDK（langchain-openai 已覆盖大部分场景，保留供直连）----
 openai>=1.20,<3
