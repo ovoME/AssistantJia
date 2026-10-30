@@ -6,7 +6,7 @@ import sys
 import unittest
 
 from data.datasets import FIXTURE_ROOT
-from data.recommendation import Recommender, recommendation_topic
+from data.recommendation import Recommender, recommendation_topic, wants_popular
 from test_recommendation import book, engine_for
 
 
@@ -56,9 +56,37 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual(recommendation_topic("推荐机器学习的书"), "机器学习")
         self.assertEqual(recommendation_topic("推荐看见这本书"), "看见")
         self.assertEqual(recommendation_topic("推荐C++的书"), "c++")
+        self.assertEqual(recommendation_topic("你给我推荐一点热门的书籍把"), "")
+        self.assertEqual(recommendation_topic("推荐Python的书把！"), "python")
+        self.assertEqual(recommendation_topic("推荐《一把》"), "一把")
+        self.assertTrue(wants_popular("你给我推荐一点热门的书籍把"))
+        self.assertFalse(wants_popular("推荐《热门话题》"))
+        self.assertFalse(wants_popular("不要推荐热门的书"))
         self.assertEqual(engine.discover(query="推荐《平凡的世界》")[0]["title"], "平凡的世界")
         self.assertTrue(all(row["call_number"].startswith("TP")
                             for row in engine.discover(category="TP", limit=20)))
+
+    def test_explicit_popularity_samples_high_borrow_candidates_without_sorted_output(self):
+        books = [book(i) for i in range(1, 31)]
+        pairs = [(f"reader-{index}", index) for index in range(30) for _ in range(30-index)]
+        engine, _, _ = engine_for(books, pairs)
+        outcomes = [engine.discover(query="你给我推荐一点热门的书籍把", limit=3, rng=random.Random(seed))
+                    for seed in range(20)]
+        self.assertTrue(all(len(batch) == 3 and all(row["count"] >= 21 for row in batch)
+                            for batch in outcomes))
+        self.assertTrue(all(row["strategy"] == "popular" and "历史" in row["reason"]
+                            for batch in outcomes for row in batch))
+        self.assertTrue(any([row["count"] for row in batch] != sorted((row["count"] for row in batch), reverse=True)
+                            for batch in outcomes))
+        first = outcomes[0]
+        second = engine.discover(query="推荐热门书", limit=3, avoid=[row["book_key"] for row in first],
+                                 rng=random.Random(20))
+        self.assertFalse({row["book_key"] for row in first} & {row["book_key"] for row in second})
+
+    def test_popular_request_does_not_invent_borrowing_activity(self):
+        engine, _, _ = engine_for([book(1), book(2)], [])
+        self.assertEqual(engine.discover(query="推荐热门书"), [])
+        self.assertEqual(len(engine.discover(query="推荐几本书")), 2)
 
     def test_cli_defaults_to_topic_aware_discovery(self):
         result = subprocess.run([sys.executable, "-S", "-W", "error", "-m", "data.scripts.recommend",

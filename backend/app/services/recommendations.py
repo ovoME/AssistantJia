@@ -3,7 +3,7 @@ from collections import OrderedDict
 from contextlib import nullcontext
 from threading import Lock
 
-from data.recommendation import recommendation_topic
+from data.recommendation import recommendation_topic, wants_popular
 
 
 _RECENT = OrderedDict()
@@ -14,7 +14,7 @@ _MAX_SCOPES = 500
 
 def discover(engine, reader_id=None, limit=5, query=None, session_id=None):
     """基于当前会话和主题尽量换一批；无会话时独立抽样。"""
-    scope = (session_id, id(engine), recommendation_topic(query)) if session_id else None
+    scope = (session_id, id(engine), recommendation_topic(query), wants_popular(query)) if session_id else None
     # 同一会话同一主题的并发请求串行轮换，不阻塞其他大多数会话。
     guard = _SCOPE_LOCKS[hash(scope) % len(_SCOPE_LOCKS)] if scope else nullcontext()
     with guard:

@@ -34,6 +34,16 @@ def test_repeated_chat_question_rotates_results_and_reports_actual_titles(client
     assert first_text != second_text
 
 
+def test_user_question_returns_popular_candidates_from_simulated_data(client, integration):
+    question = "你给我推荐一点热门的书籍把"
+    first, first_text = cards(client.post("/api/chat", json={"message": question, "session_id": "popular"}))
+    second, _ = cards(client.post("/api/chat", json={"message": question, "session_id": "popular"}))
+    assert len(first) == len(second) == 5
+    assert "没有找到" not in first_text
+    assert all(row["strategy"] == "popular" and row["count"] >= 9 for row in first + second)
+    assert {row["book_key"] for row in first}.isdisjoint(row["book_key"] for row in second)
+
+
 @pytest.mark.parametrize("message,expected", [("推荐3本书", 3), ("请推荐十本图书", 10)])
 def test_chat_respects_common_requested_counts(client, integration, message, expected):
     rows, _ = cards(client.post("/api/chat", json={"message": message}))
