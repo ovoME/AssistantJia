@@ -66,7 +66,7 @@ jobs:
           # 未单独配置 GHCR_PAT 时回退到内置 token（配合上方 packages: write 即可推送）
           password: ${{ secrets.GHCR_PAT || secrets.GITHUB_TOKEN }}
       - name: 构建并推送后端镜像
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: backend/Dockerfile
@@ -75,7 +75,7 @@ jobs:
             ${{ env.IMAGE_BACKEND }}:latest
             ${{ env.IMAGE_BACKEND }}:${{ github.sha }}
       - name: 构建并推送前端镜像
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./frontend
           push: true
