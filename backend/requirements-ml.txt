@@ -9,7 +9,7 @@
 # 注意磁盘占用：sentence-transformers 会连带安装 torch 与 CUDA 运行库，约 4-6 GB。
 
 # ---- 向量数据库 ----
-chromadb>=0.4.24,<2
+chromadb>=1.5.9,<2
 
 # ---- Embedding 模型 ----
 sentence-transformers>=2.6,<4
