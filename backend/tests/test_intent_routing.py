@@ -164,3 +164,130 @@ def test_no_tool_result_preserves_local_multisource_evidence(client, integration
     text = "".join(row.get("token", "") for row in items if row["type"] == "content")
     assert "实时" in text and "没有已导入" in text
     assert not any(kind == "reply" for kind, _ in calls)
+
+
+def test_exam_request_uses_model_keywords_and_full_catalog(client, monkeypatch):
+    calls = install_model(monkeypatch, lambda messages: tool_call(
+        "recommend_books", query="软件工程 考研", limit=5,
+        search_terms=["计算机 考研", "数据结构 考研", "软件工程"]))
+    books = {
+        "计算机 考研": [
+            {"book_key": "wrong", "title": "材料力学辅导及考研应试指导", "author": "计算机教材委员会",
+             "call_number": "TB1/1", "isbn": ""},
+            {"book_key": "one", "title": "计算机组成原理考研指导", "author": "甲",
+             "call_number": "TP3/1", "isbn": ""},
+        ],
+        "数据结构 考研": [{"book_key": "two", "title": "数据结构考研辅导教程", "author": "乙",
+                           "call_number": "TP3/2", "isbn": ""}],
+        "软件工程": [{"book_key": "three", "title": "软件工程", "author": "丙",
+                      "call_number": "TP3/3", "isbn": ""}],
+    }
+
+    class FullCatalog:
+        def search(self, query, limit):
+            return books.get(query, [])
+
+        def info(self):
+            return {"dataset_label": "real"}
+
+    monkeypatch.setattr(local_data, "catalog", lambda: FullCatalog())
+    question = "我要考研是软件工程的学生，帮我推荐一些考研的资料，图书馆里面有的"
+    items = events(client.post("/api/chat", json={"message": question, "session_id": "exam"}))
+    cards = [row["data"] for row in items if row["type"] == "card"]
+    assert {row["book_key"] for row in cards} == {"one", "two", "three"}
+    assert all(row["strategy"] == "catalog_match" and row["dataset_label"] == "real" for row in cards)
+    assert all(row["available"] is None and row["location"] is None and not row["is_live"] for row in cards)
+    text = "".join(row.get("token", "") for row in items if row["type"] == "content")
+    assert "目标院校的考试科目" in text and "书目快照" in text and "实时可借状态" in text
+    assert "材料力学" not in text and "408" not in text
+    assert [row["type"] for row in items[:2]] == ["thought", "thought"]
+    assert [kind for kind, _ in calls].count("route") == 1
+    assert not any(kind == "reply" for kind, _ in calls)
+
+
+def test_compound_query_falls_back_to_specific_topic_without_unrelated_exam_books(client, monkeypatch):
+    install_model(monkeypatch, lambda messages: tool_call("recommend_books", query="软件工程 考研"))
+    queries = []
+
+    class Catalog:
+        def search(self, query, limit):
+            queries.append(query)
+            return ([{"book_key": "software", "title": "软件工程基础", "author": "作者",
+                      "call_number": "TP3/4", "isbn": ""}] if query == "软件工程" else [])
+
+        def info(self):
+            return {"dataset_label": "real"}
+
+    monkeypatch.setattr(local_data, "catalog", lambda: Catalog())
+    items = events(client.post("/api/chat", json={"message": "软件工程考研推荐资料"}))
+    cards = [row["data"] for row in items if row["type"] == "card"]
+    assert [row["title"] for row in cards] == ["软件工程基础"]
+    assert "软件工程 考研" in queries and "软件工程" in queries and "考研" not in queries
+
+
+def test_catalog_fallback_for_authenticated_reader_discloses_history_limitation(client, monkeypatch):
+    install_model(monkeypatch, lambda messages: tool_call("recommend_books", query="软件工程 考研"))
+
+    class Catalog:
+        def search(self, query, limit):
+            return ([{"book_key": "software", "title": "软件工程基础", "author": "作者",
+                      "call_number": "TP3/4", "isbn": ""}] if query == "软件工程" else [])
+
+        def info(self):
+            return {"dataset_label": "real"}
+
+    monkeypatch.setattr(local_data, "catalog", lambda: Catalog())
+    token = sign_reader_token("demo-reader", settings.READER_TOKEN_SECRET, time.time() + 3600)
+    items = events(client.post("/api/chat", json={"message": "推荐软件工程考研资料"},
+                              headers={"Authorization": "Bearer " + token}))
+    assert any(row["type"] == "card" for row in items)
+    assert "没有按个人借阅历史过滤" in "".join(row.get("token", "") for row in items if row["type"] == "content")
+
+
+def test_no_topic_match_does_not_supply_unrelated_catalog_books(client, monkeypatch):
+    calls = install_model(monkeypatch, lambda messages: tool_call("recommend_books", query="稀有的虚构学科 考研"))
+    monkeypatch.setattr(local_data, "catalog", lambda: SimpleNamespace(search=lambda query, limit: []))
+    items = events(client.post("/api/chat", json={"message": "推荐稀有的虚构学科考研资料"}))
+    assert not any(row["type"] == "card" for row in items)
+    assert "没有找到直接匹配" in "".join(row.get("token", "") for row in items if row["type"] == "content")
+    assert not any(kind == "reply" for kind, _ in calls)
+
+
+def test_direct_recommendation_tool_uses_catalog_keywords_and_reports_scope(monkeypatch):
+    from app.agent.tools.recommend import recommend_books
+
+    class Catalog:
+        def search(self, query, limit):
+            return ([{"book_key": "one", "title": "软件工程基础", "author": "甲",
+                      "call_number": "TP3/1", "isbn": ""}] if query == "软件工程" else [])
+
+        def info(self):
+            return {"dataset_label": "real"}
+
+    monkeypatch.setattr(local_data, "catalog", lambda: Catalog())
+    result = json.loads(recommend_books.invoke({"query": "软件工程 考研", "search_terms": ["软件工程"]}))
+    assert result["status"] == "success" and result["scope"] == "catalog_recommendation_candidates"
+    assert result["recommendations"][0]["title"] == "软件工程基础"
+    invalid = json.loads(recommend_books.invoke({"limit": 101, "query": "软件工程", "search_terms": ["软件工程"]}))
+    assert invalid["status"] == "error"
+
+
+def test_catalog_rotation_avoids_repeating_titles_when_enough_candidates_exist():
+    from app.services.recommendations import catalog_candidates
+
+    class Catalog:
+        def search(self, query, limit):
+            return [{"book_key": str(i), "title": f"软件工程参考书{i}", "author": "作者"} for i in range(4)]
+
+    catalog = Catalog()
+    one = catalog_candidates(catalog, ["软件工程"], limit=2, session_id="rotation-test")
+    two = catalog_candidates(catalog, ["软件工程"], limit=2, session_id="rotation-test")
+    assert {row["title"] for row in one}.isdisjoint(row["title"] for row in two)
+
+
+def test_popular_request_never_claims_unmeasured_catalog_candidates_are_popular(client, monkeypatch):
+    install_model(monkeypatch, lambda messages: tool_call(
+        "recommend_books", query="稀有的虚构学科", search_terms=["软件工程"], popular=True))
+    monkeypatch.setattr(local_data, "catalog", lambda: pytest.fail("无热度依据时不能使用书目候选充当热门"))
+    items = events(client.post("/api/chat", json={"message": "推荐稀有的虚构学科热门书"}))
+    assert not any(row["type"] == "card" for row in items)

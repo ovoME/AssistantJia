@@ -67,7 +67,6 @@ class LibraryAgent:
         return "data: " + json.dumps(data, ensure_ascii=False, allow_nan=False) + "\n\n"
 
     def _run_recommend(self, reader_id, question=None, session_id=None, model_args=None):
-        service = local_data.borrowing()
         limit = recommendation_limit(question, default=None)
         query, popular = question, None
         if model_args is not None:
@@ -80,16 +79,32 @@ class LibraryAgent:
             if limit is None and isinstance(model_limit, int) and not isinstance(model_limit, bool) and 1 <= model_limit <= 20:
                 limit = model_limit
         limit = limit or 5
-        rows = data_client.get_recommendations(reader_id, limit=limit, query=query, session_id=session_id, popular=popular)
-        cards = [recommendation_card(row, service.engine.dataset_label) for row in rows]
+        search_terms = model_args.get("search_terms") if model_args else None
+        payload = data_client.get_recommendation_bundle(
+            reader_id, limit=limit, query=query, session_id=session_id, popular=popular, search_terms=search_terms)
+        rows, queries = payload["recommendations"], payload["search_terms"]
+        if payload.get("scope") == "catalog_recommendation_candidates":
+            cards = [recommendation_card(row, payload["dataset_label"]) for row in rows]
+            titles = "、".join("《" + row["title"] + "》" for row in rows[:3])
+            guidance = ("请按目标院校的考试科目和教材版本核对"
+                        if re.search(r"考研|备考|考试|研究生|复试", question or "")
+                        else "请核对是否适合你的需求及所需版本")
+            reply = (f"在已导入的书目快照中找到{titles}等相关资料。"
+                     f"这些是关键词匹配的候选，{guidance}；实时可借状态和架位尚未核实。")
+            if reader_id:
+                reply += "书目候选没有按个人借阅历史过滤。"
+            return ("recommend_books", {"limit": limit, "query": query, "search_terms": queries, "popular": popular},
+                    payload, cards, reply)
+        cards = [recommendation_card(row, payload["dataset_label"]) for row in rows]
         if cards:
             titles = "、".join("《" + row["title"] + "》" for row in rows[:3])
             reply = f"可借状态和架位未核实。给你挑了{titles}；推荐来自历史借阅样本。"
         elif recommendation_topic(query):
-            reply = "历史样本中没有找到与该主题直接匹配的推荐，可以换个书名、作者或类别。"
+            reply = ("历史样本和本地书目没有找到直接匹配的资料，可以提供更具体的学科、书名或作者。"
+                     if queries and not popular else "历史样本中没有找到与该主题直接匹配的推荐，可以换个书名、作者或类别。")
         else:
             reply = "该筛选条件下没有剩余推荐候选。"
-        return "recommend_books", {"limit": limit, "query": query, "popular": popular}, {"recommendations": rows, **service.metadata()}, cards, reply
+        return "recommend_books", {"limit": limit, "query": query, "popular": popular}, payload, cards, reply
 
     def _run_search(self, query):
         payload = local_data.search_books_response(query, 5)
@@ -217,6 +232,9 @@ class LibraryAgent:
         # 结构化多源摘要是按导入样本计算的，直接回传可避免模型添加未核验的统计结论。
         if tool == "query_multimodal_data":
             return fallback
+        # 书目候选只证明关键词匹配，由代码说明来源与大纲限制，避免模型补造考试要求。
+        if payload.get("scope") == "catalog_recommendation_candidates":
+            return fallback
         if not self._llm_ready():
             return fallback
         # 借阅为空（未登录，或确实没借）：直接给确定提示，否则模型会向读者索要借书证号，
@@ -281,11 +299,11 @@ class LibraryAgent:
             degraded = False
             tool, args, payload, cards = None, {}, {}, []
             reply = "我是小嘉，可以查询本地书目、推荐图书，以及根据馆方资料回答借阅规则。实时借阅操作请在馆方系统办理。"
-            if self._llm_ready():
-                yield self._format_sse({"type": "thought", "content": "正在理解你的问题…"})
+            yield self._format_sse({"type": "thought", "content": "正在理解你的问题…"})
             routed = await self._route_with_llm(message, reader_id, history)
             used_local_fallback = self._llm_ready() and routed is None
             try:
+                yield self._format_sse({"type": "thought", "content": "正在查询相关数据…"})
                 if routed is None:
                     # 模型未配置或调用失败时才使用关键词兜底。
                     prepared = await asyncio.to_thread(self._prepare, message, reader_id, session_id)
@@ -304,7 +322,6 @@ class LibraryAgent:
                 reply = "相关数据服务当前未就绪，请稍后重试；需要实时业务请使用馆方系统或咨询总服务台。"
                 degraded = True
             if tool:
-                yield self._format_sse({"type": "thought", "content": "正在查询已加载的数据与已核对规则…"})
                 yield self._format_sse({"type": "tool_call", "tool": tool, "args": args})
             for card in cards:
                 yield self._format_sse({"type": "card", "card_type": "book", "data": card})
