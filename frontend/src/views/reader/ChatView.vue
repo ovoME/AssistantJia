@@ -155,7 +155,7 @@ async function onRenew(book: BorrowRecord) {
             <summary>读者凭证（可选）</summary>
             <input v-model="readerToken" type="password" placeholder="输入已签发的访问凭证" aria-label="读者访问凭证" autocomplete="off" />
             <button class="cu-btn cu-btn-plain" @click="applyReaderToken">使用凭证</button>
-            <p>未提供凭证时显示热门推荐。</p>
+            <p>未提供凭证时展示探索推荐。</p>
           </details>
           <button
             v-for="(q, i) in quickQuestions"

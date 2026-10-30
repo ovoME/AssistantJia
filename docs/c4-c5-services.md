@@ -8,7 +8,7 @@
 | --- | --- |
 | C4 规则 | 六个馆方公开页面，十二个主题切块；TF-IDF 稀疏向量、余弦检索、主题约束、来源链接和修订/采集时间 |
 | C5 统计 | 概览、热门、分类、出版社及需求参考，从同批 C1 流水计算，不再返回固定数字 |
-| C2 接入 | 默认内容融合推荐；匿名为热门，个人推荐只接受已验证身份 |
+| C2 接入 | 探索推荐结合主题与个人兴趣，匿名不推断个人偏好；个人推荐只接受已验证身份 |
 | C3 接入 | 读取只读 SQLite 目录；空结果不补演示书单，架位和可借量缺失保持 null |
 | 资源统计 | 座位、研讨室、门禁事件/汇总、读者和学者库分别聚合，管理端展示，不推测跨表关联 |
 | OPAC 适配 | LibraryProvider 契约及 disabled/demo 实现，预留当前借阅、续借、预约和馆藏状态入口 |
@@ -77,7 +77,7 @@ python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
 | GET /api/books/search | 公开静态书目，保留 dataset_label/scope/built_at/is_live/limitations |
 | GET /api/books/{isbn} | 合法 ISBN 精确查询，未命中不返回无关书 |
 | GET /api/knowledge/search?question=... | 公开规则摘要与可追溯 sources，未命中明确说明 |
-| GET /api/recommend | 匿名热门；Bearer 凭证解析后才按本人历史计算推荐 |
+| GET /api/recommend | 匿名探索推荐；Bearer 凭证解析后才按本人历史计算推荐，可选主题 query |
 | GET /api/hot-books | 历史样本热门，分类过滤有效，非全馆实时榜 |
 | GET /api/admin/stats/summary,hot-books,categories,publishers,trend,usage | 管理密钥保护，缺日期的 trend 返回空列表及原因 |
 | POST /api/admin/purchase-advice | 历史高频需求模板，不冒称 AI 分析，不编造复本承载比、长期零借阅或增购数量 |

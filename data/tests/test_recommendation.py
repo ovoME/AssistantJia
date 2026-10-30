@@ -228,7 +228,7 @@ class RecommendationTests(unittest.TestCase):
             output = folder / "private/result.json"
             result = subprocess.run([
                 sys.executable, "-S", "-W", "error", "-m", "data.scripts.recommend", "--data-dir", str(folder),
-                "--reader-id", "0001", "--limit", "2", "--output", str(output),
+                "--reader-id", "0001", "--limit", "2", "--strategy", "hybrid", "--output", str(output),
             ], cwd=ROOT, capture_output=True, text=True, encoding="utf-8", env=self._utf8_env())
             self.assertEqual(result.returncode, 0, result.stderr)
             payload = json.loads(output.read_text(encoding="utf-8"))

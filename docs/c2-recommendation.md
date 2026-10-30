@@ -1,6 +1,6 @@
 # C2 推荐交付约定
 
-交付日期：2026 年 10 月 24 日。输入为 C1 输出，回归测试使用虚构记录，并已在本地使用提供的真实借阅表做功能和离线效果验证。C2 交付历史借阅推荐算法、Python 调用及 CLI；后续 HTTP 数据切换与认证已完成，见 [服务接入](c4-c5-services.md)。
+交付日期：2026 年 10 月 24 日。输入为 C1 输出，回归测试使用虚构记录，并已在本地使用提供的真实借阅表做功能和离线效果验证。聊天、HTTP 与 CLI 的当前交互推荐使用 `discovery`，按主题和兴趣抽样并优先更换上一批，详见 [探索推荐说明与评估](c2-discovery-evaluation.md)。本文的四种确定性策略保留供显式调用和离线基线对照。
 
 ## 输入和生命周期
 
@@ -23,7 +23,7 @@
 
 基础分保持首版规则：同时有协同与分类信号时权重为 `0.6/0.3/0.1`；只有协同时为 `0.9/0.1`；只有分类时为 `0.8/0.2`；两者都没有时仅按热门度。`category` 和 `collaborative` 策略只启用各自的个性化信号及热门兜底，`popular` 只按热门度。
 
-默认 hybrid 新增静态书目内容索引。题名经 NFKC、大小写规范化后，在连续文字片段内取相邻两个字符；完整责任者作为单个特征；索书号仅解析分类段（如 TP311.1），使用首位数字、前三字符和完整分类，不用斜线后的种次号。题名、作者、粗/中/细分类特征权重分别为 1、2、0.5/1/1.5，同一分类特征重合时保留较细层级的权重。不使用出版社、读者身份或借阅次数作为内容特征；不跨不同责任者字符串猜测同一作者。
+基线 hybrid 使用静态书目内容索引。题名经 NFKC、大小写规范化后，在连续文字片段内取相邻两个字符；完整责任者作为单个特征；索书号仅解析分类段（如 TP311.1），使用首位数字、前三字符和完整分类，不用斜线后的种次号。题名、作者、粗/中/细分类特征权重分别为 1、2、0.5/1/1.5，同一分类特征重合时保留较细层级的权重。不使用出版社、读者身份或借阅次数作为内容特征；不跨不同责任者字符串猜测同一作者。
 
 仅保留至少出现于两本书、少于全部书目、且文档频次不超过 `max(2, 书目数×15%)` 的特征，排除无区分度的常见词；未知、佚名等责任者不建特征。特征乘以 `log((N+1)/(df+1))` 后做 L2 归一化。读者画像为不同已读书向量之和再归一化，倒排索引计算候选与画像的余弦相似度。静态书目中零训练借阅次数的书也可通过内容进入候选；词面相似不代表深层语义理解。
 
@@ -45,12 +45,13 @@ C1 已将合法 ISBN10/13 转为 ISBN13 主键，并通过唯一财产号关联�
 from data.recommendation import Recommender
 
 engine = Recommender.from_directory("data/processed")
-recommendations = engine.recommend(reader_id="000002", limit=5)
+recommendations = engine.discover(reader_id="000002", limit=5, query="计算机")
+baseline = engine.recommend(reader_id="000002", limit=5)
 literature_hot = engine.hot_books(category="I", limit=10)
 response = engine.response(reader_id="000002", limit=5)
 ```
 
-`recommend()` 的参数名兼容现有 `DataClient.get_recommendations(reader_id, limit)`；`hot_books(category, limit)` 可供现有 `/api/hot-books` 使用。现有数据客户端已通过缓存服务加载引擎并接入路由；后端镜像从仓库根构建并复制标准库数据模块，Compose 只读挂载处理结果目录。
+`discover()` 供交互服务和 CLI 使用，`recommend()` 保留确定性基线，`hot_books(category, limit)` 可供现有 `/api/hot-books` 使用。数据客户端通过缓存服务加载引擎并接入路由；后端镜像从仓库根构建并复制标准库数据模块，Compose 只读挂载处理结果目录。
 
 response 为 `{code: 0, message: "success", data: [...], dataset_label, limitations}`。每本书含原契约要求的 `title/author/isbn/call_number/reason`，以及 `book_key/publisher/category/category_name/count/score/strategy`。ISBN 缺失仍为空字符串，book_key 用于唯一识别；输出 strategy 表示主要依据（content/collaborative/category/popular）。内容分贡献大于基础分贡献时标记 content；这是新增的输出值，输入策略仍只有 hybrid/popular/category/collaborative 四种。冷启动不会伪称个性化。应保留 dataset_label 和历史样本限制，避免模拟数据被展示成馆方实时数据。
 

@@ -82,11 +82,14 @@ python -m data.scripts.generate_demo --rows 36908 --output data/demo/borrow_reco
 先完成上面的 C1 清洗，再从仓库根目录运行：
 
 ```powershell
-# 不传读者为热门兜底；分类先筛选再取前 N 本，支持 T 大类和 TP 等字母前缀
+# 交互探索推荐可按书名、作者或主题筛选；模拟资料无需真实文件
+python -m data.scripts.recommend --data-dir data/fixtures/integration --query Python
+# 显式查看热门基线；分类支持 T 大类和 TP 等字母前缀
 python -m data.scripts.recommend --strategy popular --category TP --limit 10
-# 使用完整已读集合过滤，默认混合协同过滤、分类偏好和热门度
+# 探索推荐会过滤完整已读集合，结合内容、相似读者和分类偏好
 python -m data.scripts.recommend --reader-id 000002 --limit 5
-# 单独运行分类偏好或协同过滤，可指定其他 C1 输出目录
+# 原有可复现排名保留为显式基线，可单独运行分类偏好或协同过滤
+python -m data.scripts.recommend --reader-id 000002 --strategy hybrid --limit 5
 python -m data.scripts.recommend --reader-id 000002 --strategy category --category I
 python -m data.scripts.recommend --reader-id 000002 --strategy collaborative --data-dir data/processed
 # 可选写入本地文件；默认只向终端输出 JSON
@@ -96,6 +99,8 @@ python -m data.scripts.validate_recommendations --limit 20 --holdout-readers 200
 ```
 
 `hybrid`、`popular`、`category`、`collaborative` 四种策略均过滤该读者的全部已借书籍；无历史或无相似读者时使用可用的分类偏好或热门度，不补回已读书。缺 ISBN 的不同副本在完整题名、作者、出版社精确一致，且不涉及多个 ISBN 时可合并为同一推荐候选。仅从历史借阅中出现过的书目推荐，不能表示全馆书目或实时可借书。
+
+聊天、HTTP 推荐和 CLI 默认使用 `discovery`：按用户主题筛选，在符合条件的候选中结合兴趣抽样，不按借阅次数排序；同一服务进程内的同一会话会优先避开上一批书。匿名用户从候选书目中抽样，不推断个人兴趣；候选不足时可能重复。原有四种确定性策略保留供基线对比。细节及真实样本离线对照见 [探索推荐说明](../docs/c2-discovery-evaluation.md)。
 
 C2 运行时仅依赖 Python 标准库，读入 `books.csv`、完整 `borrow_records.csv` 和可选的 `quality_report.json`，不依赖 LLM、向量库或 pandas。清洗仍使用 C1 的 pandas/openpyxl 依赖。输入缺失或不同批次的文件计数不匹配时明确报错。
 
@@ -130,7 +135,7 @@ C1–C5 的本地数据、推荐、规则检索和统计接口已实现并接入
 
 ## C4/C5 与资源统计
 
-规则来源为已核对的图书馆官网摘要，支持带引用的本地稀疏向量检索。统计、推荐和目录接口已接入，前端默认访问后端。管理接口需配置访问密钥，个人推荐使用可信签发的读者令牌；无凭证只提供热门推荐。
+规则来源为已核对的图书馆官网摘要，支持带引用的本地稀疏向量检索。统计、推荐和目录接口已接入，前端默认访问后端。管理接口需配置访问密钥，个人推荐使用可信签发的读者令牌；无凭证提供非个性化探索推荐。
 
 ```powershell
 python -S -m data.scripts.build_knowledge --question "普通图书续借几次"

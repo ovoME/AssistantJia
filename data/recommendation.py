@@ -6,6 +6,7 @@ import csv
 import heapq
 import json
 import math
+import random
 import re
 import unicodedata
 from collections import Counter, defaultdict
@@ -23,9 +24,40 @@ BOOK_FIELDS = {
 }
 LOAN_FIELDS = {"reader_id", "book_key"}
 
+# 只剥离常见提问套话；剩余词必须匹配书目信息或明确的中图分类。
+_QUESTION_WORDS = re.compile(
+    r"小嘉|能不能|可不可以|有没有|有哪些|有什么|有啥|给我|帮我|为我|麻烦|请问|请|我想看|我想读|想看|想读|我想|想要|我喜欢|喜欢|"
+    r"推荐|介绍|最近|大家|都在|看什么|什么|热门|榜单|好看的|好看|好书|"
+    r"书籍|书本|几本|一本|这本|那本|一些|一批|换一批|再来|关于|有关|相关|方面|"
+    r"按我的兴趣|我的兴趣|适合我|适合|看看|吗|呢|吧|一下"
+)
+_TOPIC_CATEGORIES = {"计算机": ("call", "TP3"), "编程": ("call", "TP31"),
+                     "文学": ("category", "I"), "经济": ("category", "F"),
+                     "历史": ("category", "K")}
+
 
 def _text(value: str) -> str:
     return " ".join(unicodedata.normalize("NFKC", value).split())
+
+
+def recommendation_topic(query: str | None) -> str:
+    """从常见自然语言问法提取检索词，无法匹配时不伪造其他主题的推荐。"""
+    if query is None:
+        return ""
+    if not isinstance(query, str) or len(query) > 2000:
+        raise ValueError("推荐问题必须为不超过 2000 字的文本。")
+    quoted = re.search(r"《([^》]+)》", query)
+    if quoted:
+        return _text(quoted.group(1)).casefold()
+    topic = re.sub(r"图书馆(?=(?:里|内|的)?(?:有|推荐|热门))", "", _text(query).casefold())
+    topic = _QUESTION_WORDS.sub("", topic)
+    topic = re.sub(r"[^\w\u4e00-\u9fff+#.\-]+", "", topic)
+    while True:
+        reduced = re.sub(r"^的|(?:的?(?:类书|类型|类|图书|书)|的)$", "", topic)
+        if reduced == topic:
+            break
+        topic = reduced
+    return topic
 
 
 def _limit(value: int) -> int:
@@ -250,12 +282,92 @@ class Recommender:
         return [{**self._item(key), "score": round(score, 8), "reason": reason, "strategy": method}
                 for score, key, reason, method in ranked[:limit]]
 
+    def discover(self, reader_id: str | None = None, limit: int = 5, query: str | None = None,
+                 avoid: Iterable[str] = (), rng=None, category: str | None = None) -> list[dict]:
+        """依据问题和可用的个人兴趣抽取多样候选；不使用借阅次数排序。"""
+        limit, category = _limit(limit), _category(category)
+        if reader_id is not None and not isinstance(reader_id, str):
+            raise ValueError("reader_id 必须为文本，以保留前导零。")
+        topic = recommendation_topic(query)
+        history = self._histories.get(_text(reader_id or ""), set())
+        candidates = self._candidates(category, history)
+        if topic:
+            spec = _TOPIC_CATEGORIES.get(topic)
+            def matches(key):
+                book = self._books[key]
+                fields = (book["title"], book["author"], book["publisher"],
+                          book["category_name"], book["call_number"])
+                if any(topic in _text(field).casefold() for field in fields):
+                    return True
+                if spec and spec[0] == "category":
+                    return book["category_code"] == spec[1]
+                return bool(spec and spec[0] == "call" and book["call_number"].upper().startswith(spec[1]))
+            candidates = [key for key in candidates if matches(key)]
+        if not candidates:
+            return []
+
+        content = self._content.scores(history) if history else {}
+        collaborative = self._collaborative_scores(_text(reader_id or ""), history) if history else {}
+        preferences = Counter(self._books[key]["category_code"] for key in history
+                              if self._books[key]["category_code"] != "UNKNOWN")
+        total_preferences = sum(preferences.values())
+        max_content = max((content.get(key, 0) for key in candidates), default=0)
+        max_cf = max((collaborative.get(key, 0) for key in candidates), default=0)
+        scored = []
+        for key in candidates:
+            content_score = content.get(key, 0) / max_content if max_content else 0
+            cf_score = collaborative.get(key, 0) / max_cf if max_cf else 0
+            preference = preferences[self._books[key]["category_code"]] / total_preferences if total_preferences else 0
+            score = 0.65 * content_score + 0.25 * cf_score + 0.10 * preference
+            if topic:
+                reason, method = f"根据提问中的“{topic}”匹配书目", "topic"
+            elif content_score:
+                reason, method = "根据你借过图书的内容相似度推荐", "content"
+            elif cf_score:
+                reason, method = "根据相似借阅兴趣推荐", "collaborative"
+            elif preference:
+                reason, method = "根据你的借阅分类偏好推荐", "category"
+            else:
+                reason, method = "从历史借阅样本书目中探索推荐", "discovery"
+            scored.append((key, score, reason, method))
+
+        # 优先避开上一批，在新旧候选内优先选有兴趣证据的书。
+        # 在组内按兴趣相关度加权抽样，匿名用户均匀抽样，不使用借阅量。
+        rng = rng if rng is not None else random.Random()
+        excluded = set(avoid)
+        result = []
+        relevant_rows = [row for row in scored if row[1] > 0]
+        # 把抽样限制在较相关的候选池内，避免大量微弱匹配稀释个人兴趣。
+        relevant_rows = heapq.nlargest(max(limit * 3, 15), relevant_rows,
+                                        key=lambda row: (row[1], rng.random()))
+        groups = ((True, relevant_rows), (False, [row for row in scored if row[1] <= 0]))
+        for fresh in (True, False):
+            for relevant, group in groups:
+                pool = [row for row in group if (row[0] not in excluded) == fresh]
+                needed = limit - len(result)
+                if not needed:
+                    break
+                def draw_key(row):
+                    weight = (0.05 + row[1]) ** 2 if relevant else 1.0
+                    return math.log(max(rng.random(), 1e-300)) / weight
+                result.extend(heapq.nlargest(needed, pool, key=draw_key))
+            if len(result) == limit:
+                break
+        return [{**self._item(key), "score": round(score, 8), "reason": reason, "strategy": method}
+                for key, score, reason, method in result]
+
     def response(self, reader_id: str | None = None, limit: int = 5,
-                 category: str | None = None, strategy: str = "hybrid") -> dict:
+                 category: str | None = None, strategy: str = "hybrid", query: str | None = None) -> dict:
         """现有 /api/recommend 响应字段；服务端须先确认目标读者身份。"""
+        if strategy == "discovery":
+            rows = self.discover(reader_id, limit, query, category=category)
+        else:
+            if query is not None:
+                raise ValueError("query 仅支持 discovery 策略。")
+            rows = self.recommend(reader_id, limit, category, strategy)
         return {
             "code": 0, "message": "success",
-            "data": self.recommend(reader_id, limit, category, strategy),
+            "data": rows,
             "dataset_label": self.dataset_label,
             "limitations": [
                 "推荐依据历史借阅样本，未验证实时可借状态或架位。",

@@ -42,7 +42,7 @@
 
 | 范围 | 方式 | 说明 |
 |---|---|---|
-| 匿名可访问 | 无 | `/chat`、`/books/search`、`/books/{isbn}`、`/books/holdings/*`、`/hot-books`、`/recommend`（仅热门兜底）、`/knowledge/search`、`/data/status`、`/health` |
+| 匿名可访问 | 无 | `/chat`、`/books/search`、`/books/{isbn}`、`/books/holdings/*`、`/hot-books`、`/recommend`（非个性化探索）、`/knowledge/search`、`/data/status`、`/health` |
 | 管理端 | `X-Admin-Token: <token>` | `/api/admin/*` 全部接口。服务端未配置密钥时返回 `503`，密钥错误返回 `401` |
 | 读者个人数据 | `Authorization: Bearer <token>` | 令牌由运维/登录端用 `READER_TOKEN_SECRET` 签发（HMAC-SHA256），不可由浏览器自行构造 |
 
@@ -276,11 +276,12 @@ data: {"type": "done"}
 ### 4.1 读者个性化推荐
 - **Method**: `GET`
 - **Path**: `/api/recommend`
-- **Query Params**: `limit` (default 5, 1–20)
+- **Query Params**: `limit` (default 5, 1–20)、可选 `query`（书名、作者或主题）
 - **Headers**: 可选 `Authorization: Bearer <token>`
 - **语义**:
-  - **匿名**：返回全馆热门兜底，不含任何个人偏好推断。
-  - **已认证**：按令牌身份返回个性化推荐，并过滤已读。
+  - **匿名**：从历史样本书目探索推荐，不推断个人偏好。
+  - **已认证**：结合本人内容、相似读者和分类偏好，并过滤已读。
+  - 主题根据书目字段或约定分类匹配，无匹配返回空列表。同一进程中的同一会话优先避开上一批，候选不足、服务重启或多 worker 时可能重复；不按借阅次数排序。
   - 匿名传 `reader_id` → `401`；令牌与 `reader_id` 不一致 → `403`。
 - **Response**:
 ```json
