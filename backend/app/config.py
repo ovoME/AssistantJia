@@ -4,7 +4,13 @@ from typing import Literal, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, field_validator
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+def _project_root_for(config_file: Path) -> Path:
+    """Resolve the project root in both source-checkout and Docker layouts."""
+    backend_dir = Path(config_file).resolve().parent.parent
+    return backend_dir.parent if backend_dir.name == "backend" else backend_dir
+
+
+PROJECT_ROOT = _project_root_for(Path(__file__))
 
 def _resolve_path(v: str) -> str:
     p = Path(v)

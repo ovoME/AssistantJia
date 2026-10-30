@@ -24,9 +24,8 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 from zipfile import BadZipFile, ZipFile
 import openpyxl
-from app.config import settings
+from app.config import PROJECT_ROOT, settings
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
 IMPORTED_DIR = PROJECT_ROOT / "data" / "imported"
 MANIFEST_FILE = IMPORTED_DIR / "data_manifest.json"
 logger = logging.getLogger(__name__)
