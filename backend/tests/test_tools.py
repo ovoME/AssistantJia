@@ -19,6 +19,13 @@ def test_get_user_borrows():
     assert data['borrows'][0]['dataset_label'] == 'simulated'
 
 
+def test_get_user_borrows_without_identity_requires_login():
+    data = json.loads(get_user_borrows.invoke({}))
+    assert data['status'] == 'error'
+    assert '登录' in data['message']
+    assert 'borrows' not in data
+
+
 def test_renew_book_normal():
     data = json.loads(renew_book.invoke({'reader_id':'demo-reader','book_id':'DEMO-COPY-001'}))
     assert data['success'] is True

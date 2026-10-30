@@ -27,7 +27,7 @@ LOAN_FIELDS = {"reader_id", "book_key"}
 # 只剥离常见提问套话；剩余词必须匹配书目信息或明确的中图分类。
 _QUESTION_WORDS = re.compile(
     r"小嘉|能不能|可不可以|有没有|有哪些|有什么|有啥|给我|帮我|为我|麻烦|请问|请|我想看|我想读|想看|想读|我想|想要|我喜欢|喜欢|"
-    r"推荐点|来点|一点|推荐|介绍|最近|大家|都在|看什么|什么|热门|榜单|好看的|好看|好书|"
+    r"不要推荐热门|不要热门|不想看热门|不想要热门|推荐点|来点|一点|推荐|介绍|最近|大家|都在|看什么|什么|最受欢迎|受欢迎|人气|热借|热榜|热门|榜单|好看的|好看|好书|"
     r"书籍|书本|几本|一本|这本|那本|一些|一批|换一批|再来|关于|有关|相关|方面|"
     r"按我的兴趣|我的兴趣|适合我|适合|看看|吗|呢|吧|一下"
 )
@@ -49,7 +49,8 @@ def recommendation_topic(query: str | None) -> str:
     quoted = re.search(r"《([^》]+)》", query)
     if quoted:
         return _text(quoted.group(1)).casefold()
-    topic = re.sub(r"图书馆(?=(?:里|内|的)?(?:有|推荐|热门))", "", _text(query).casefold())
+    topic = re.sub(r"把(?=\s*[？?。！!，,]*\s*$)", "", _text(query).casefold())
+    topic = re.sub(r"图书馆(?=(?:里|内|的)?(?:有|推荐|热门))", "", topic)
     topic = re.sub(r"^你(?:能|可以)?", "", topic)
     topic = re.sub(r"(?:\d{1,3}|[一二两三四五六七八九十百]+)\s*(?:本|册|部)", "", topic)
     topic = _QUESTION_WORDS.sub("", topic)
@@ -60,6 +61,22 @@ def recommendation_topic(query: str | None) -> str:
             break
         topic = reduced
     return topic
+
+
+def excludes_popular(query: str | None) -> bool:
+    """识别对热门推荐的明确否定，防止语义路由反转用户意图。"""
+    if not isinstance(query, str):
+        return False
+    text = re.sub(r"《[^》]*》", "", _text(query))
+    return bool(re.search(r"(?:不要|不想|别|不用)(?:再|看|要|推荐|只看)?(?:热门|人气|受欢迎|热借|热榜)", text))
+
+
+def wants_popular(query: str | None) -> bool:
+    """仅在读者明确要求热门时使用历史热度；书名内出现“热门”不算。"""
+    if not isinstance(query, str) or excludes_popular(query):
+        return False
+    text = re.sub(r"《[^》]*》", "", _text(query))
+    return bool(re.search(r"热门|人气|受欢迎|热借|热榜", text))
 
 
 def _limit(value: int) -> int:
@@ -285,12 +302,16 @@ class Recommender:
                 for score, key, reason, method in ranked[:limit]]
 
     def discover(self, reader_id: str | None = None, limit: int = 5, query: str | None = None,
-                 avoid: Iterable[str] = (), rng=None, category: str | None = None) -> list[dict]:
+                 avoid: Iterable[str] = (), rng=None, category: str | None = None,
+                 popular: bool | None = None) -> list[dict]:
         """依据问题和可用的个人兴趣抽取多样候选；不使用借阅次数排序。"""
         limit, category = _limit(limit), _category(category)
         if reader_id is not None and not isinstance(reader_id, str):
             raise ValueError("reader_id 必须为文本，以保留前导零。")
+        if popular is not None and not isinstance(popular, bool):
+            raise ValueError("popular 必须为布尔值。")
         topic = recommendation_topic(query)
+        popular = wants_popular(query) if popular is None else popular
         history = self._histories.get(_text(reader_id or ""), set())
         candidates = self._candidates(category, history)
         if topic:
@@ -305,6 +326,13 @@ class Recommender:
                     return book["category_code"] == spec[1]
                 return bool(spec and spec[0] == "call" and book["call_number"].upper().startswith(spec[1]))
             candidates = [key for key in candidates if matches(key)]
+        if popular and candidates:
+            counts = [self._counts[key] for key in candidates if self._counts[key] > 0]
+            if not counts:
+                return []
+            # 从历史借阅较多的候选中抽样；保留并列项，不对输出按借阅量排序。
+            cutoff = min(heapq.nlargest(max(limit * 2, 10), counts))
+            candidates = [key for key in candidates if self._counts[key] >= cutoff]
         if not candidates:
             return []
 
@@ -321,7 +349,11 @@ class Recommender:
             cf_score = collaborative.get(key, 0) / max_cf if max_cf else 0
             preference = preferences[self._books[key]["category_code"]] / total_preferences if total_preferences else 0
             score = 0.65 * content_score + 0.25 * cf_score + 0.10 * preference
-            if topic:
+            if topic and popular:
+                reason, method = f"从与“{topic}”相关的历史借阅热门候选中推荐", "popular"
+            elif popular:
+                reason, method = "从历史借阅较多的候选中轮换推荐", "popular"
+            elif topic:
                 reason, method = f"根据提问中的“{topic}”匹配书目", "topic"
             elif content_score:
                 reason, method = "根据你借过图书的内容相似度推荐", "content"

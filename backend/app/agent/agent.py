@@ -1,6 +1,7 @@
 """规则、目录和推荐的可追溯 SSE 编排；有 LLM 时只据实际工具结果组织回复。"""
 import asyncio
 import json
+import logging
 import re
 from collections import OrderedDict
 from app.config import settings
@@ -10,9 +11,10 @@ from app.agent.prompts import (KNOWLEDGE_SUMMARY_PROMPT, ROUTER_PROMPT, SYSTEM_P
 from app.agent.tools.data_client import data_client
 from app.services import local_data
 from app.services.data_manager import data_manager
-from data.recommendation import recommendation_topic
+from data.recommendation import excludes_popular, recommendation_topic, wants_popular
 
 SESSION_HISTORIES = OrderedDict()
+logger = logging.getLogger(__name__)
 
 
 def get_session_history(session_id):
@@ -36,11 +38,11 @@ def search_query(message):
     return re.sub(r"(相关的书|相关图书|的书|在哪.*|在几楼.*|有没有.*|可以借吗.*|能借吗.*|[？?。])$", "", text).strip()
 
 
-def recommendation_limit(message):
+def recommendation_limit(message, default=5):
     """提取常见的推荐数量，限制在接口允许的范围内。"""
     match = re.search(r"(\d{1,3}|[一二两三四五六七八九十]{1,3})\s*(?:本|册|部)", message or "")
     if not match:
-        return 5
+        return default
     word = match.group(1)
     digits = {"一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5,
               "六": 6, "七": 7, "八": 8, "九": 9}
@@ -51,26 +53,58 @@ def recommendation_limit(message):
         count = digits.get(left, 1 if not left else 0) * 10 + digits.get(right, 0)
     else:
         count = digits.get(word, 0)
-    return min(count, 20) if count > 0 else 5
+    return min(count, 20) if count > 0 else default
+
+
+def clear_book_recommendation(message):
+    """模型未选工具时，仅对明确的正向荐书请求使用本地兜底。"""
+    return bool("书" in message and any(word in message for word in ("推荐", "好书", "看什么"))
+                and not re.search(r"(?:不要|不用|不需要|不想|别).{0,8}推荐", message))
 
 
 class LibraryAgent:
     def _format_sse(self, data):
         return "data: " + json.dumps(data, ensure_ascii=False, allow_nan=False) + "\n\n"
 
-    def _run_recommend(self, reader_id, question=None, session_id=None):
-        service = local_data.borrowing()
-        limit = recommendation_limit(question)
-        rows = data_client.get_recommendations(reader_id, limit=limit, query=question, session_id=session_id)
-        cards = [recommendation_card(row, service.engine.dataset_label) for row in rows]
+    def _run_recommend(self, reader_id, question=None, session_id=None, model_args=None):
+        limit = recommendation_limit(question, default=None)
+        query, popular = question, None
+        if model_args is not None:
+            topic = model_args.get("query")
+            query = topic if isinstance(topic, str) and recommendation_topic(topic) else None
+            popular = not excludes_popular(question) and (
+                model_args.get("popular") is True or wants_popular(question) or wants_popular(topic)
+            )
+            model_limit = model_args.get("limit")
+            if limit is None and isinstance(model_limit, int) and not isinstance(model_limit, bool) and 1 <= model_limit <= 20:
+                limit = model_limit
+        limit = limit or 5
+        search_terms = model_args.get("search_terms") if model_args else None
+        payload = data_client.get_recommendation_bundle(
+            reader_id, limit=limit, query=query, session_id=session_id, popular=popular, search_terms=search_terms)
+        rows, queries = payload["recommendations"], payload["search_terms"]
+        if payload.get("scope") == "catalog_recommendation_candidates":
+            cards = [recommendation_card(row, payload["dataset_label"]) for row in rows]
+            titles = "、".join("《" + row["title"] + "》" for row in rows[:3])
+            guidance = ("请按目标院校的考试科目和教材版本核对"
+                        if re.search(r"考研|备考|考试|研究生|复试", question or "")
+                        else "请核对是否适合你的需求及所需版本")
+            reply = (f"在已导入的书目快照中找到{titles}等相关资料。"
+                     f"这些是关键词匹配的候选，{guidance}；实时可借状态和架位尚未核实。")
+            if reader_id:
+                reply += "书目候选没有按个人借阅历史过滤。"
+            return ("recommend_books", {"limit": limit, "query": query, "search_terms": queries, "popular": popular},
+                    payload, cards, reply)
+        cards = [recommendation_card(row, payload["dataset_label"]) for row in rows]
         if cards:
             titles = "、".join("《" + row["title"] + "》" for row in rows[:3])
             reply = f"可借状态和架位未核实。给你挑了{titles}；推荐来自历史借阅样本。"
-        elif recommendation_topic(question):
-            reply = "历史样本中没有找到与该主题直接匹配的推荐，可以换个书名、作者或类别。"
+        elif recommendation_topic(query):
+            reply = ("历史样本和本地书目没有找到直接匹配的资料，可以提供更具体的学科、书名或作者。"
+                     if queries and not popular else "历史样本中没有找到与该主题直接匹配的推荐，可以换个书名、作者或类别。")
         else:
             reply = "该筛选条件下没有剩余推荐候选。"
-        return "recommend_books", {"limit": limit, "query": question}, {"recommendations": rows, **service.metadata()}, cards, reply
+        return "recommend_books", {"limit": limit, "query": query, "popular": popular}, payload, cards, reply
 
     def _run_search(self, query):
         payload = local_data.search_books_response(query, 5)
@@ -105,7 +139,7 @@ class LibraryAgent:
         """按工具名执行只读查询；关键词命中与模型路由共用同一条路径。"""
         args = args or {}
         if tool == "recommend_books":
-            return self._run_recommend(reader_id, question or args.get("query"), session_id)
+            return self._run_recommend(reader_id, question or args.get("query"), session_id, model_args=args)
         if tool == "get_user_borrows":
             return self._run_borrows(reader_id)
         if tool == "search_books":
@@ -124,38 +158,60 @@ class LibraryAgent:
             return self._run_search(search_query(q))
         if not quoted and any(word in q for word in ["续借", "借期", "多久", "几天", "多少天", "几本", "几册", "多少册", "多少本", "上限", "开馆", "闭馆", "开放", "几点", "座位", "暂离", "积分", "规则", "规定", "预约", "委托", "研讨室", "假期", "充电宝", "校外", "现刊", "工具书", "报纸", "押金", "罚款"]):
             return self._run_rules(q)
-        multi_answer = data_manager.query_multimodal_knowledge(q)
+        multi_answer = self._run_multimodal(q)
         if multi_answer:
-            return (
-                "query_multimodal_data",
-                {"domain": multi_answer["domain"], "query": q},
-                multi_answer,
-                [],
-                multi_answer["reply"],
-            )
+            return multi_answer
         return None, {}, {}, [], "我是小嘉，可以查询本地书目、推荐图书，以及根据馆方资料回答借阅规则。实时借阅操作请在馆方系统办理。"
 
-    async def _route_with_llm(self, message, reader_id):
-        """关键词没命中时让模型判断该查哪一项；模型不可用或拿不准时返回 None 走对话。"""
+    def _run_multimodal(self, question):
+        result = data_manager.query_multimodal_knowledge(question)
+        if result:
+            return "query_multimodal_data", {"domain": result["domain"], "query": question}, result, [], result["reply"]
+        return None
+
+    async def _route_with_llm(self, message, reader_id, history=None):
+        """模型先判断只读意图；None 表示不可用，(None,{}) 表示无需工具。"""
         if not self._llm_ready():
             return None
         try:
             from langchain_openai import ChatOpenAI
-            from langchain_core.messages import SystemMessage, HumanMessage
+            from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
             from app.agent.tools import READ_TOOLS
             llm = ChatOpenAI(model=settings.LLM_MODEL, api_key=settings.LLM_API_KEY,
                              base_url=settings.LLM_BASE_URL, temperature=0,
                              timeout=15, max_retries=0)
-            result = await llm.bind_tools(READ_TOOLS).ainvoke(
-                [SystemMessage(content=ROUTER_PROMPT), HumanMessage(content=message)])
+            messages = [SystemMessage(content=ROUTER_PROMPT)]
+            for item in (history or [])[-10:]:
+                if item.get("role") == "user":
+                    messages.append(HumanMessage(content=item["content"]))
+                elif item.get("role") == "assistant":
+                    messages.append(AIMessage(content=item["content"]))
+            if not history or history[-1].get("role") != "user" or history[-1].get("content") != message:
+                messages.append(HumanMessage(content=message))
+            result = await llm.bind_tools(READ_TOOLS).ainvoke(messages)
             calls = getattr(result, "tool_calls", None) or []
             if not calls:
-                return None
+                return (None, {})
             call = calls[0]
             name = call.get("name") if isinstance(call, dict) else getattr(call, "name", None)
             args = call.get("args") if isinstance(call, dict) else getattr(call, "args", {})
-            return (name, args or {}) if name else None
-        except Exception:
+            allowed = {"search_books", "recommend_books", "search_knowledge", "get_user_borrows"}
+            if name not in allowed or not isinstance(args, dict):
+                return None
+            if name in {"search_books", "search_knowledge"}:
+                value = args.get("query") or args.get("question")
+                if not isinstance(value, str) or not value.strip() or len(value) > 2000:
+                    return None
+            if name == "recommend_books":
+                value, popular = args.get("query"), args.get("popular")
+                if value is not None and (not isinstance(value, str) or len(value) > 2000):
+                    return None
+                if popular is not None and not isinstance(popular, bool):
+                    return None
+            return name, args
+        except Exception as exc:
+            logger.warning("Model intent routing failed: type=%s status=%s", type(exc).__name__,
+                           getattr(exc, "status_code", None))
             return None
 
     def _llm_ready(self):
@@ -172,9 +228,12 @@ class LibraryAgent:
                 + "。临时安排以馆方公告为准。")
 
     async def _compose_reply(self, message, tool, args, payload, fallback, history):
-        """每一条用户消息都交给大模型组织语言；模型缺失或调用失败时退回规则原文。"""
+        """按实际工具证据组织回复；模型缺失或调用失败时使用本地回答。"""
         # 结构化多源摘要是按导入样本计算的，直接回传可避免模型添加未核验的统计结论。
         if tool == "query_multimodal_data":
+            return fallback
+        # 书目候选只证明关键词匹配，由代码说明来源与大纲限制，避免模型补造考试要求。
+        if payload.get("scope") == "catalog_recommendation_candidates":
             return fallback
         if not self._llm_ready():
             return fallback
@@ -226,7 +285,9 @@ class LibraryAgent:
             if tool == "get_user_borrows":
                 return text.strip() + "\n\n借阅状态以馆方系统为准，续借和逾期处理需走馆方渠道。"
             return text.strip() + "\n\n依据本次历史数据或静态书目；实时可借状态、架位和业务办理尚未核实。"
-        except Exception:
+        except Exception as exc:
+            logger.warning("Model reply composition failed: type=%s status=%s", type(exc).__name__,
+                           getattr(exc, "status_code", None))
             return fallback
 
     async def stream_chat(self, message, session_id="default", reader_id=None):
@@ -236,24 +297,31 @@ class LibraryAgent:
         context_token = active_reader.set(reader_id)
         try:
             degraded = False
+            tool, args, payload, cards = None, {}, {}, []
+            reply = "我是小嘉，可以查询本地书目、推荐图书，以及根据馆方资料回答借阅规则。实时借阅操作请在馆方系统办理。"
+            yield self._format_sse({"type": "thought", "content": "正在理解你的问题…"})
+            routed = await self._route_with_llm(message, reader_id, history)
+            used_local_fallback = self._llm_ready() and routed is None
             try:
-                tool, args, payload, cards, reply = await asyncio.to_thread(self._prepare, message, reader_id, session_id)
+                yield self._format_sse({"type": "thought", "content": "正在查询相关数据…"})
+                if routed is None:
+                    # 模型未配置或调用失败时才使用关键词兜底。
+                    prepared = await asyncio.to_thread(self._prepare, message, reader_id, session_id)
+                elif routed[0] is None:
+                    # 未调用工具时，明确荐书请求仍需真实书目，不能由模型自行编造。
+                    if clear_book_recommendation(message):
+                        prepared = await asyncio.to_thread(self._prepare, message, reader_id, session_id)
+                        used_local_fallback = True
+                    else:
+                        prepared = await asyncio.to_thread(self._run_multimodal, message)
+                else:
+                    prepared = await asyncio.to_thread(self._execute, routed[0], routed[1], reader_id, message, session_id)
+                if prepared:
+                    tool, args, payload, cards, reply = prepared
             except (OSError, ValueError, PermissionError, RuntimeError):
-                tool, args, payload, cards = None, {}, {}, []
                 reply = "相关数据服务当前未就绪，请稍后重试；需要实时业务请使用馆方系统或咨询总服务台。"
                 degraded = True
-            # 关键词没命中时，让模型判断是不是该查数据（例如"三体在不在馆"这种说法）。
-            if tool is None and not degraded:
-                routed = await self._route_with_llm(message, reader_id)
-                if routed:
-                    try:
-                        executed = await asyncio.to_thread(self._execute, routed[0], routed[1], reader_id, message, session_id)
-                    except (OSError, ValueError, PermissionError, RuntimeError):
-                        executed = None
-                    if executed:
-                        tool, args, payload, cards, reply = executed
             if tool:
-                yield self._format_sse({"type": "thought", "content": "正在查询已加载的数据与已核对规则…"})
                 yield self._format_sse({"type": "tool_call", "tool": tool, "args": args})
             for card in cards:
                 yield self._format_sse({"type": "card", "card_type": "book", "data": card})
@@ -261,6 +329,8 @@ class LibraryAgent:
             # 数据服务异常时保留原始提示，不交给模型改写。
             if not degraded:
                 reply = await self._compose_reply(message, tool, args, payload, reply, history)
+            if used_local_fallback:
+                reply += "\n\n模型未能完成意图识别，本次按本地规则处理。"
             for start in range(0, len(reply), 24):
                 yield self._format_sse({"type": "content", "token": reply[start:start + 24]})
                 await asyncio.sleep(0)

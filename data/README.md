@@ -100,7 +100,9 @@ python -m data.scripts.validate_recommendations --limit 20 --holdout-readers 200
 
 `hybrid`、`popular`、`category`、`collaborative` 四种策略均过滤该读者的全部已借书籍；无历史或无相似读者时使用可用的分类偏好或热门度，不补回已读书。缺 ISBN 的不同副本在完整题名、作者、出版社精确一致，且不涉及多个 ISBN 时可合并为同一推荐候选。仅从历史借阅中出现过的书目推荐，不能表示全馆书目或实时可借书。
 
-聊天、HTTP 推荐和 CLI 默认使用 `discovery`：按用户主题筛选，在符合条件的候选中结合兴趣抽样，不按借阅次数排序；同一服务进程内的同一会话会优先避开上一批书。匿名用户从候选书目中抽样，不推断个人兴趣；候选不足时可能重复。原有四种确定性策略保留供基线对比。细节及真实样本离线对照见 [探索推荐说明](../docs/c2-discovery-evaluation.md)。
+聊天、HTTP 推荐和 CLI 默认使用 `discovery`：按用户主题筛选，在符合条件的候选中结合兴趣抽样，不按借阅次数排序；同一服务进程内的同一会话会优先避开上一批书。明确要求“热门”时，先筛选历史借阅较多的候选，再换批抽样，不能代表实时热度。匿名用户不推断个人兴趣；候选不足时可能重复。原有四种确定性策略保留供基线对比。细节及真实样本离线对照见 [探索推荐说明](../docs/c2-discovery-evaluation.md)。
+
+聊天和推荐工具对于有具体主题的请求，还可以用模型提出的相关短词查询 C3 完整书目快照；历史样本无匹配时也会尝试更具体的原始主题。此时标记 `scope=catalog_recommendation_candidates`、`strategy=catalog_match`，只表示关键词检索候选，并非热门、个性化、实时在架或确定符合考试大纲。登录读者看到此类兜底候选时会注明未按借阅历史过滤；原 HTTP 和 CLI 推荐仍使用历史样本。多词检索要求题名同时包含这些词，降低无关书目命中；无法匹配时不会补造书名。
 
 C2 运行时仅依赖 Python 标准库，读入 `books.csv`、完整 `borrow_records.csv` 和可选的 `quality_report.json`，不依赖 LLM、向量库或 pandas。清洗仍使用 C1 的 pandas/openpyxl 依赖。输入缺失或不同批次的文件计数不匹配时明确报错。
 

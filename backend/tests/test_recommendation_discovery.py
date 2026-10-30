@@ -34,6 +34,16 @@ def test_repeated_chat_question_rotates_results_and_reports_actual_titles(client
     assert first_text != second_text
 
 
+def test_user_question_returns_popular_candidates_from_simulated_data(client, integration):
+    question = "你给我推荐一点热门的书籍把"
+    first, first_text = cards(client.post("/api/chat", json={"message": question, "session_id": "popular"}))
+    second, _ = cards(client.post("/api/chat", json={"message": question, "session_id": "popular"}))
+    assert len(first) == len(second) == 5
+    assert "没有找到" not in first_text
+    assert all(row["strategy"] == "popular" and row["count"] >= 9 for row in first + second)
+    assert {row["book_key"] for row in first}.isdisjoint(row["book_key"] for row in second)
+
+
 @pytest.mark.parametrize("message,expected", [("推荐3本书", 3), ("请推荐十本图书", 10)])
 def test_chat_respects_common_requested_counts(client, integration, message, expected):
     rows, _ = cards(client.post("/api/chat", json={"message": message}))
@@ -109,13 +119,22 @@ def test_model_cannot_invent_books_when_no_topic_matches(client, integration, mo
 
     class InventingModel:
         def __init__(self, **kwargs):
-            calls.append(True)
+            self.router = False
+
+        def bind_tools(self, tools):
+            self.router = True
+            return self
 
         async def ainvoke(self, messages):
+            calls.append("router" if self.router else "compose")
+            if self.router:
+                return SimpleNamespace(content="", tool_calls=[
+                    {"name": "recommend_books", "args": {"query": "不存在的xyz主题"}}
+                ])
             return SimpleNamespace(content="我给你推荐一本虚构的书。")
 
     monkeypatch.setattr(langchain_openai, "ChatOpenAI", InventingModel)
     monkeypatch.setattr(settings, "LLM_API_KEY", "unit-test-only")
     rows, text = cards(client.post("/api/chat", json={"message": "推荐不存在的xyz主题的书"}))
     assert not rows and "没有找到" in text
-    assert not calls
+    assert calls == ["router"]
