@@ -19,7 +19,7 @@ python-multipart>=0.0.9,<1
 # 配置 LLM_API_KEY 时走 LangChain 真实工具调用；未配置时自动降级为关键词规则引擎
 langchain-core>=0.2,<2
 langchain-openai>=0.1,<2
-httpx>=0.27,<1
+httpx>=0.28.1,<1
 
 # ---- 测试 ----
 pytest>=9.1.1,<10
