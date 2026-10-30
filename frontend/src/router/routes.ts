@@ -1,0 +1,28 @@
+import type { RouteRecordRaw } from 'vue-router'
+
+export const routes: RouteRecordRaw[] = [
+  {
+    path: '/',
+    name: 'reader',
+    component: () => import('@/views/reader/ChatView.vue'),
+    meta: { title: '小嘉 · 图书馆智能馆员' },
+  },
+  {
+    path: '/admin',
+    name: 'admin',
+    component: () => import('@/views/admin/DashboardView.vue'),
+    meta: { title: '管理端 · 数据看板' },
+  },
+  {
+    path: '/admin/data',
+    name: 'admin-data',
+    component: () => import('@/views/admin/DataManageView.vue'),
+    meta: { title: '管理端 · 数据管理' },
+  },
+  {
+    path: '/admin/settings',
+    name: 'admin-settings',
+    component: () => import('@/views/admin/SettingsView.vue'),
+    meta: { title: '管理端 · 系统设置' },
+  },
+]
