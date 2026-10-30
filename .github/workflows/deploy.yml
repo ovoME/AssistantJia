@@ -57,7 +57,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: 登录 GHCR
         uses: docker/login-action@v3
         with:
@@ -91,7 +91,7 @@ jobs:
     if: needs.guard.outputs.ready == 'true'
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: 部署
         uses: appleboy/ssh-action@v1.0.3
         with:
